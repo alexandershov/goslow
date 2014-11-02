@@ -1,25 +1,27 @@
 ## Why?
 Sometimes you need to test how does your application handle slow/buggy
-external API responses. Goslow can help you with that.
+external API responses. Goslow can help you with that (as long as you can easily
+  configure API server endpoint).
 
 ## Quick start
-Let's say you want to simulate a delay of 10 seconds.
+Let's say you want to see what happens when API starts to respond in 10 seconds.
 
-Just specify delay in subdomain and get canned JSON response after 3 seconds:
+First, you need to replace calls to your API server with calls to 10.goslow.link
+
 ```shell
 time curl 10.goslow.link
 {"goslow": "link"}
-3.023 total
+10.023 total
 ```
 
-Any URL path works:
+You're callling an API with path "/users"? Not a problem:
 ```shell
 time curl 5.goslow.link/users/
 {"goslow": "link"}
 5.123 total
 ```
 
-Post requests also work:
+Post requests? Yep:
 ```shell
 echo '{"name": "Rob"}' | time curl -d @- 5.goslow.link/users
 {"goslow": "link"}
@@ -33,7 +35,7 @@ time curl 199.goslow.link/users
 199.128 total
 ```
 
-Yes, I've really waited for 99 seconds to post this.
+Yes, I've really waited for 199 seconds to post this.
 
 Super long delays:
 ```shell
