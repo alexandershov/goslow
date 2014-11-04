@@ -1,54 +1,57 @@
 ## Why?
 Sometimes you need to test how does your application handle slow/buggy
 external API responses. Goslow can help you with that (as long as you can easily
-  configure API server endpoint).
+  configure API server domain name).
 
 ## Quick start
-Let's say you want to see what happens when API starts to respond in 10 seconds.
+Let's say you're developing an application against the [Facebook graph API](https://developers.facebook.com/docs/graph-api/quickstart/v2.2) and
+you want to see what happens when endpoint *graph.facebook.com/me* starts to respond in 10 seconds.
 
-First, you need to replace calls to your API server with calls to 10.goslow.link
+Just configure your app to make requests to *10.goslow.link* instead of *graph.facebook.com*
+and you're set:
 
 ```shell
-time curl 10.goslow.link
+time curl 10.goslow.link/me
 {"goslow": "link"}
 10.023 total
 ```
 
-You're callling an API with path "/users"? Not a problem:
+Now, obviously, you got a canned JSON response that has no relation to graph API whatsoever.
+We'll get to that later.
+
+By the way different endpoints and POST requests also work:
 ```shell
-time curl 5.goslow.link/users/
+echo "your payload"| time curl -d @- 10.goslow.link/me/feed?message="test"
 {"goslow": "link"}
-5.123 total
+10.123 total
 ```
 
-Post requests? Yep:
+Need to simulate 6 seconds delay? Just replace calls to *10.goslow.link* with
+*6.goslow.link*
+
 ```shell
-echo '{"name": "Rob"}' | time curl -d @- 5.goslow.link/users
+time curl 6.goslow.link/me
 {"goslow": "link"}
-5.123 total
+6.128 total
 ```
 
-Really long delays:
+Need to simulate a long delay? Use *99.goslow.link*:
 ```shell
-time curl 199.goslow.link/users
+time curl 99.goslow.link/me
 {"goslow": "link"}
-199.128 total
+99.104 total
 ```
 
-Yes, I've really waited for 199 seconds to post this.
+Need to simulate a 500 seconds delay? We should use *500.goslow.link*, right?
 
-Super long delays:
+No. Domains *100.goslow.link*, *101.goslow.link*, ..., *599.goslow.link* respond with
+HTTP status codes 100, 101, ..., 599 without any delay:
+
 ```shell
-time curl 500.goslow.link/users
+time curl 500.goslow.link/me
 Internal Server Error
 0.052 total
 ```
-Internal Serve Error?! 0.052 seconds?! But we've specified 500 seconds delay.
-
-That's right. Maximum delay is 99 seconds.
-
-Requests to 100.goslow.link, 101.goslow.link, ..., 599.goslow.link respond with
-HTTP status code 100, 101, ..., 599 without any delay.
 
 
 ## Not-so-quick start
