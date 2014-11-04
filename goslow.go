@@ -6,5 +6,9 @@ import (
 
 func main() {
 	config := NewConfigFromArgs()
-	log.Printf("config: %+v", config)
+	store := NewMemoryStore()
+	server := &GoSlowServer{Config: config, Store: store}
+	server.AddDefaultRules()
+
+	log.Fatal(server.ListenAndServe())
 }

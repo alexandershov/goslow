@@ -9,50 +9,48 @@ import (
 )
 
 const (
-	DEFAULT_DB             = ""
+	DEFAULT_HOST           = "localhost"
 	DEFAULT_ADDRESS        = ":5103"
-	DEFAULT_KEY_SALT       = ""
+	DEFAULT_DB             = ""
 	DEFAULT_MIN_KEY_LENGTH = 6
+	DEFAULT_KEY_SALT       = ""
 )
 
 type Config struct {
-	Db           string
+	Host         string
 	Address      string
-	KeySalt      string
+	Db           string
 	MinKeyLength int
+	KeySalt      string
 }
 
 func NewConfigFromArgs() *Config {
-	argsConfig := new(Config)
-	DefineFlags(argsConfig)
-	configPath := flag.String("config", "", "Path to config file")
+	config := new(Config)
+	DefineFlags(config)
+	// TODO: think about making configPath a field in the Config struct
+	configPath := flag.String("config", "", "path to config file. E.g: /path/to/config.json")
 	flag.Parse()
 	if *configPath != "" {
-		if argsConfig.HasNonDefaultValue() {
-			log.Fatalf("You can't mix --config option with other options")
+		if config.HasNonDefaultValue() {
+			log.Fatal("You can't mix -config option with other options")
 		}
-		return NewConfigFromFile(*configPath)
+		return AddConfigFromFile(*configPath, config)
 	}
-	return argsConfig
-}
-
-func DefineFlags(config *Config) {
-	flag.StringVar(&config.Db, "db", DEFAULT_DB, "Database connection string")
-	flag.StringVar(&config.Address, "address", DEFAULT_ADDRESS, "Address to listen on")
-	flag.StringVar(&config.KeySalt, "key-salt", DEFAULT_KEY_SALT, "hashids key salt")
-	flag.IntVar(&config.MinKeyLength, "min-key-length", DEFAULT_MIN_KEY_LENGTH,
-		"minimum hashids key length")
-}
-
-func NewConfigFromFile(path string) *Config {
-	ValidateConfig(path)
-	config := ReadConfig(path)
-
 	return config
 }
 
-func ReadConfig(path string) *Config {
-	config := new(Config)
+func DefineFlags(config *Config) {
+	flag.StringVar(&config.Host, "host", DEFAULT_HOST, "deployment host. E.g: localhost")
+	flag.StringVar(&config.Address, "address", DEFAULT_ADDRESS, "address to listen on. E.g: 0.0.0.0:8000")
+	flag.StringVar(&config.Db, "db", DEFAULT_DB, `database connection string. E.g: postgres://user:password@localhost/dbname.
+	Goslow will use the in-memory store if you don't specify the connection string`)
+	flag.IntVar(&config.MinKeyLength, "min-key-length", DEFAULT_MIN_KEY_LENGTH,
+		"minimum hashids key length. E.g: 8")
+	flag.StringVar(&config.KeySalt, "key-salt", DEFAULT_KEY_SALT, "hashids key salt. E.g: kj8ioIxZ")
+}
+
+func AddConfigFromFile(path string, config *Config) *Config {
+	ValidateConfig(path)
 	Unmarshal(path, config)
 	return config
 }
@@ -69,19 +67,30 @@ func Unmarshal(path string, i interface{}) {
 }
 
 func ValidateConfig(path string) {
-	config := new(Config)
 	m := make(map[string]interface{})
 	Unmarshal(path, &m)
-	key, foundExtra := GetExtraKey(m, config)
-	if foundExtra {
-		log.Fatalf("Found unknown key <%s> in config %s. Allowed keys: %s", key, path, GetStructFieldNames(*config))
+	knownFields := GetConfigFieldNames()
+	key, foundUnknown := FindUnknownField(m, knownFields)
+	if foundUnknown {
+		log.Fatalf("Found unknown key <%s> in config %s. Allowed keys: %s", key, path, knownFields)
 	}
 }
 
-func GetExtraKey(m map[string]interface{}, config *Config) (key string, foundExtra bool) {
-	structFields := GetStructFieldNames(*config)
+func GetConfigFieldNames() []string {
+	return GetStructFieldNames(reflect.TypeOf(Config{}))
+}
+
+func GetStructFieldNames(typ reflect.Type) []string {
+	fields := make([]string, 0, typ.NumField())
+	for i := 0; i < typ.NumField(); i++ {
+		fields = append(fields, typ.Field(i).Name)
+	}
+	return fields
+}
+
+func FindUnknownField(m map[string]interface{}, knownFields []string) (key string, foundUnknown bool) {
 	for _, key := range GetMapKeys(m) {
-		if !Contains(structFields, key) {
+		if !Contains(knownFields, key) {
 			return key, true
 		}
 	}
@@ -96,15 +105,6 @@ func GetMapKeys(m map[string]interface{}) []string {
 	return keys
 }
 
-func GetStructFieldNames(i interface{}) []string {
-	typ := reflect.TypeOf(i)
-	fields := make([]string, 0, typ.NumField())
-	for i := 0; i < typ.NumField(); i++ {
-		fields = append(fields, typ.Field(i).Name)
-	}
-	return fields
-}
-
 func Contains(items []string, elem string) bool {
 	for _, item := range items {
 		if item == elem {
@@ -115,6 +115,7 @@ func Contains(items []string, elem string) bool {
 }
 
 func (config *Config) HasNonDefaultValue() bool {
-	return config.Db != DEFAULT_DB || config.Address != DEFAULT_ADDRESS ||
-		config.KeySalt != DEFAULT_KEY_SALT || config.MinKeyLength != DEFAULT_MIN_KEY_LENGTH
+	return config.Host != DEFAULT_HOST || config.Address != DEFAULT_ADDRESS ||
+		config.Db != DEFAULT_DB || config.MinKeyLength != DEFAULT_MIN_KEY_LENGTH ||
+		config.KeySalt != DEFAULT_KEY_SALT
 }
