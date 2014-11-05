@@ -1,16 +1,18 @@
 package main
 
 import (
+	"net/http"
 	"time"
 )
 
 type Rule struct {
-	Host         string
-	Path         string
-	Method       string
-	Delay        time.Duration
-	ResponseCode int
-	Response     string
+	Host           string
+	Path           string
+	Method         string
+	Header         http.Header
+	Delay          time.Duration
+	ResponseStatus int
+	Response       string
 }
 
 func (rule *Rule) Match(path, method string) bool {
