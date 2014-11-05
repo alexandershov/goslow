@@ -13,7 +13,9 @@ func main() {
 		store = NewSqlStore(config.Db)
 	}
 	server := &GoSlowServer{Config: config, Store: store}
-	server.AddDefaultRules()
+	if config.AddDefaultRules {
+		server.AddDefaultRules()
+	}
 
 	log.Fatal(server.ListenAndServe())
 }

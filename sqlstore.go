@@ -9,6 +9,19 @@ import (
 	"time"
 )
 
+const INSERT_RULE_SQL = `
+INSERT INTO rules
+(host, path, method, header, delay, response_status, response)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+`
+
+const GET_RULES_SQL = `
+SELECT host, path, method, header, delay, response_status, response
+FROM rules
+WHERE host = $1
+ORDER BY path DESC
+`
+
 type SqlStore struct {
 	Db *sql.DB
 }
@@ -22,18 +35,15 @@ func NewSqlStore(uri string) Store {
 }
 
 func (store *SqlStore) AddRule(rule *Rule) {
-	_, err := store.RunSql("INSERT INTO rules (host, path, method, header, delay, response_status, response) values ($1, $2, $3, $4, $5, $6, $7)", rule.Host, rule.Path, rule.Method, ToHstore(HeaderToMap(rule.Header)), rule.Delay, rule.ResponseStatus, rule.Response)
+	_, err := store.Db.Query(INSERT_RULE_SQL, rule.Host, rule.Path, rule.Method,
+		MapToHstore(rule.Header), rule.Delay, rule.ResponseStatus, rule.Response)
 	if err != nil {
 		log.Fatal(err)
 	}
 }
 
-func (store *SqlStore) RunSql(query string, args ...interface{}) (*sql.Rows, error) {
-	return store.Db.Query(query, args...)
-}
-
 func (store *SqlStore) GetHostRules(host string) []*Rule {
-	rows, err := store.RunSql("SELECT host, path, method, header, delay, response_status, response FROM rules WHERE host = $1 ORDER BY path DESC", host)
+	rows, err := store.Db.Query(GET_RULES_SQL, host)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -51,7 +61,7 @@ func ReadRule(rows *sql.Rows) *Rule {
 	var delay int64
 	rows.Scan(&rule.Host, &rule.Path, &rule.Method, &header, &delay, &rule.ResponseStatus,
 		&rule.Response)
-	rule.Header = ToHeader(HstoreToMap(header))
+	rule.Header = HstoreToMap(header)
 	rule.Delay = time.Duration(delay)
 	return rule
 }
@@ -78,7 +88,7 @@ func HeaderToMap(header http.Header) map[string]string {
 	return m
 }
 
-func ToHstore(m map[string]string) hstore.Hstore {
+func MapToHstore(m map[string]string) hstore.Hstore {
 	nullMap := make(map[string]sql.NullString)
 	for key, value := range m {
 		nullMap[key] = sql.NullString{String: value, Valid: true}
@@ -86,7 +96,7 @@ func ToHstore(m map[string]string) hstore.Hstore {
 	return hstore.Hstore{nullMap}
 }
 
-func ToHeader(m map[string]string) http.Header {
+func MapToHeader(m map[string]string) http.Header {
 	header := make(map[string][]string)
 	for key, value := range m {
 		header[key] = []string{value}

@@ -35,14 +35,9 @@ func (server *GoSlowServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func AddHeaders(src http.Header, dst http.Header) {
-	if src == nil {
-		return
-	}
-	for key, values := range src {
-		for _, value := range values {
-			dst.Add(key, value)
-		}
+func AddHeaders(src map[string]string, dst http.Header) {
+	for key, value := range src {
+		dst.Add(key, value)
 	}
 }
 
@@ -56,7 +51,7 @@ func (server *GoSlowServer) AddDelayRules() {
 		delayHost := server.MakeFullHost(delay)
 		delayInSeconds := time.Duration(delay) * time.Second
 
-		server.Store.AddRule(&Rule{Host: delayHost, Delay: delayInSeconds,
+		server.Store.AddRule(&Rule{Host: delayHost, Header: EmptyHeader(), Delay: delayInSeconds,
 			ResponseStatus: 200, Response: DEFAULT_RESPONSE,
 		})
 	}
@@ -64,6 +59,10 @@ func (server *GoSlowServer) AddDelayRules() {
 
 func (server *GoSlowServer) MakeFullHost(subdomain int) string {
 	return fmt.Sprintf("%d.%s", subdomain, server.Config.Host)
+}
+
+func EmptyHeader() map[string]string {
+	return make(map[string]string)
 }
 
 func (server *GoSlowServer) AddStatusRules() {
@@ -75,14 +74,14 @@ func (server *GoSlowServer) AddStatusRules() {
 	}
 }
 
-func (server *GoSlowServer) HeaderFor(status int) http.Header {
+func (server *GoSlowServer) HeaderFor(status int) map[string]string {
 	_, isRedirect := REDIRECT_STATUS[status]
 	if isRedirect {
 		// TODO: check that protocol-independent location is legal HTTP
 		host := fmt.Sprintf("//%s", server.MakeFullHost(0))
-		return http.Header{"Location": []string{host}}
+		return map[string]string{"Location": host}
 	}
-	return nil
+	return EmptyHeader()
 }
 
 func (server *GoSlowServer) ListenAndServe() error {

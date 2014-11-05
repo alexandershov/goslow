@@ -1,7 +1,6 @@
 package main
 
 import (
-	"net/http"
 	"time"
 )
 
@@ -9,7 +8,7 @@ type Rule struct {
 	Host           string
 	Path           string
 	Method         string
-	Header         http.Header
+	Header         map[string]string
 	Delay          time.Duration
 	ResponseStatus int
 	Response       string
