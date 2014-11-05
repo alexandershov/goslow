@@ -22,7 +22,7 @@ type GoSlowServer struct {
 
 func (server *GoSlowServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	log.Printf("%s %s", r.Method, r.URL.Path)
-	rule, found := server.Store.FindRuleFor(r)
+	rule, found := FindRule(server.Store, r)
 	if found {
 		log.Printf("sleeping for %v", rule.Delay)
 		time.Sleep(rule.Delay)

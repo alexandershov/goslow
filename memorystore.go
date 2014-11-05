@@ -1,9 +1,7 @@
 package main
 
 import (
-	"net/http"
 	"sort"
-	"strings"
 )
 
 type MemoryStore struct {
@@ -24,18 +22,10 @@ func (store *MemoryStore) AddRule(rule *Rule) {
 	sort.Sort(RulesByPathLen(rules))
 }
 
-func (store *MemoryStore) FindRuleFor(r *http.Request) (rule *Rule, found bool) {
-	rules, contains := store.rules[WithoutPort(r.Host)]
+func (store *MemoryStore) GetHostRules(host string) []*Rule {
+	rules, contains := store.rules[host]
 	if contains {
-		for _, rule := range rules {
-			if rule.Match(r.URL.Path, r.Method) {
-				return rule, true
-			}
-		}
+		return rules
 	}
-	return nil, false
-}
-
-func WithoutPort(host string) string {
-	return strings.Split(host, ":")[0]
+	return make([]*Rule, 0)
 }
