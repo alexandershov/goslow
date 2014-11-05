@@ -1,5 +1,5 @@
 ## Why?
-Sometimes you need to test how does your application handle slow/buggy
+Sometimes you need to test how your application handles slow/buggy
 external API responses. Goslow can help you with that (as long as you can easily
   configure API server domain name).
 
@@ -19,7 +19,7 @@ time curl 10.goslow.link/me
 Now, obviously, you got a canned JSON response that has no relation to graph API whatsoever.
 We'll get to that later.
 
-By the way different endpoints and POST requests also work:
+By the way, different endpoints and POST requests also work:
 ```shell
 echo "your payload"| time curl -d @- 10.goslow.link/me/feed?message="test"
 {"goslow": "link"}
@@ -35,7 +35,7 @@ time curl 6.goslow.link/me
 6.128 total
 ```
 
-Need to simulate a long delay? Use *99.goslow.link*:
+Need to simulate some serious delay? Use *99.goslow.link*:
 ```shell
 time curl 99.goslow.link/me
 {"goslow": "link"}
@@ -45,7 +45,7 @@ time curl 99.goslow.link/me
 Need to simulate a 500 seconds delay? We should use *500.goslow.link*, right?
 
 No. Domains *100.goslow.link*, *101.goslow.link*, ..., *599.goslow.link* respond with
-HTTP status codes 100, 101, ..., 599 without any delay:
+HTTP status code 100, 101, ..., 599 without any delay:
 
 ```shell
 time curl 500.goslow.link/me
@@ -98,13 +98,13 @@ time curl -d @- dk8kjs.goslow.link/users
 ```
 
 ## Slow start
-If you think that relying on unprotected by passwords third-party domains is a
-bad idea, then you're probably right.
+If you think that relying on unprotected-by-passwords third-party-domains is a
+bad idea, then you're absolutely right.
 
 You can install goslow on your own server:
 
 ```shell
-go get github.com/a-ershov/goslow
+go get github.com/alexandershov/goslow github.com/lib/pq
 go build
 bin/goslow
 listening on :5103
@@ -129,8 +129,14 @@ time curl localhost:5103/some/url
 10.123 total
 ```
 
-
-
+By default goslow stores everything in memory. This means that any
+configuration you made will be lost forever after server restart.
+You need to pass
+--db option to use persistent SQL storage. Currently only postgres is supported.
+```shell
+go get github.com/lib/pq
+bin/goslow --db bin/goslow --db postgres://user@host/dbname
+```
 
 ## Contributing
 Contributing to goslow is easy.
