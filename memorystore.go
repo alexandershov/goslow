@@ -8,7 +8,7 @@ type MemoryStore struct {
 	rules map[string][]*Rule
 }
 
-func NewMemoryStore() *MemoryStore {
+func NewMemoryStore() Store {
 	return &MemoryStore{rules: make(map[string][]*Rule)}
 }
 

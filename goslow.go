@@ -6,7 +6,12 @@ import (
 
 func main() {
 	config := NewConfigFromArgs()
-	store := NewMemoryStore()
+	var store Store
+	if config.Db == "" {
+		store = NewMemoryStore()
+	} else {
+		store = NewSqlStore(config.Db)
+	}
 	server := &GoSlowServer{Config: config, Store: store}
 	server.AddDefaultRules()
 

@@ -42,7 +42,7 @@ func NewConfigFromArgs() *Config {
 func DefineFlags(config *Config) {
 	flag.StringVar(&config.Host, "host", DEFAULT_HOST, "deployment host. E.g: localhost")
 	flag.StringVar(&config.Address, "address", DEFAULT_ADDRESS, "address to listen on. E.g: 0.0.0.0:8000")
-	flag.StringVar(&config.Db, "db", DEFAULT_DB, `database connection string. E.g: postgres://user:password@localhost/dbname.
+	flag.StringVar(&config.Db, "db", DEFAULT_DB, `database connection string. E.g: postgres://user:password@localhost/dbname
 	Goslow will use the in-memory store if you don't specify the connection string`)
 	flag.IntVar(&config.MinKeyLength, "min-key-length", DEFAULT_MIN_KEY_LENGTH,
 		"minimum hashids key length. E.g: 8")
