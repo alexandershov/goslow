@@ -9,19 +9,21 @@ import (
 )
 
 const (
-	DEFAULT_HOST           = "localhost"
-	DEFAULT_ADDRESS        = ":5103"
-	DEFAULT_DB             = ""
-	DEFAULT_MIN_KEY_LENGTH = 6
-	DEFAULT_KEY_SALT       = ""
+	DEFAULT_HOST              = "localhost"
+	DEFAULT_ADDRESS           = ":5103"
+	DEFAULT_DB                = ""
+	DEFAULT_MIN_KEY_LENGTH    = 6
+	DEFAULT_KEY_SALT          = ""
+	DEFAULT_ADD_DEFAULT_RULES = false
 )
 
 type Config struct {
-	Host         string
-	Address      string
-	Db           string
-	MinKeyLength int
-	KeySalt      string
+	Host            string
+	Address         string
+	Db              string
+	MinKeyLength    int
+	KeySalt         string
+	AddDefaultRules bool
 }
 
 func NewConfigFromArgs() *Config {
@@ -47,6 +49,7 @@ func DefineFlags(config *Config) {
 	flag.IntVar(&config.MinKeyLength, "min-key-length", DEFAULT_MIN_KEY_LENGTH,
 		"minimum hashids key length. E.g: 8")
 	flag.StringVar(&config.KeySalt, "key-salt", DEFAULT_KEY_SALT, "hashids key salt. E.g: kj8ioIxZ")
+	flag.BoolVar(&config.AddDefaultRules, "add-default-rules", DEFAULT_ADD_DEFAULT_RULES, "Add default rules?")
 }
 
 func AddConfigFromFile(path string, config *Config) *Config {
@@ -117,5 +120,5 @@ func Contains(items []string, elem string) bool {
 func (config *Config) HasNonDefaultValue() bool {
 	return config.Host != DEFAULT_HOST || config.Address != DEFAULT_ADDRESS ||
 		config.Db != DEFAULT_DB || config.MinKeyLength != DEFAULT_MIN_KEY_LENGTH ||
-		config.KeySalt != DEFAULT_KEY_SALT
+		config.KeySalt != DEFAULT_KEY_SALT || config.AddDefaultRules != DEFAULT_ADD_DEFAULT_RULES
 }
