@@ -27,7 +27,8 @@ func (server *GoSlowServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		log.Printf("sleeping for %v", rule.Delay)
 		time.Sleep(rule.Delay)
 
-		AddHeaders(rule.Header, w.Header())
+		AllowCrossDomainRequests(w)
+		AddHeaders(rule.Header, w)
 		w.WriteHeader(rule.ResponseStatus)
 		io.WriteString(w, rule.Response)
 	} else {
@@ -35,9 +36,14 @@ func (server *GoSlowServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func AddHeaders(src map[string]string, dst http.Header) {
-	for key, value := range src {
-		dst.Add(key, value)
+func AllowCrossDomainRequests(w http.ResponseWriter) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+}
+
+func AddHeaders(header map[string]string, w http.ResponseWriter) {
+	responseHeader := w.Header()
+	for key, value := range header {
+		responseHeader.Add(key, value)
 	}
 }
 
