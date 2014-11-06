@@ -22,12 +22,15 @@ type GoSlowServer struct {
 
 func (server *GoSlowServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	log.Printf("%s %s", r.Method, r.URL.Path)
+	AllowCrossDomainRequests(w, r)
+	if r.Method == "OPTIONS" {
+		return
+	}
 	rule, found := FindRule(server.Store, r)
 	if found {
 		log.Printf("sleeping for %v", rule.Delay)
 		time.Sleep(rule.Delay)
 
-		AllowCrossDomainRequests(w)
 		AddHeaders(rule.Header, w)
 		w.WriteHeader(rule.ResponseStatus)
 		io.WriteString(w, rule.Response)
@@ -36,8 +39,11 @@ func (server *GoSlowServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func AllowCrossDomainRequests(w http.ResponseWriter) {
-	w.Header().Set("Access-Control-Allow-Origin", "*")
+func AllowCrossDomainRequests(w http.ResponseWriter, r *http.Request) {
+	header := w.Header()
+	header.Set("Access-Control-Allow-Origin", "*")
+	header.Set("Access-Control-Allow-Credentials", "true")
+	header["Access-Control-Allow-Headers"] = r.Header["Access-Control-Request-Headers"]
 }
 
 func AddHeaders(header map[string]string, w http.ResponseWriter) {
