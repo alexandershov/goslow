@@ -104,7 +104,8 @@ bad idea, then you're absolutely right.
 You can install goslow on your own server:
 
 ```shell
-go get github.com/alexandershov/goslow github.com/lib/pq
+go get github.com/alexandershov/goslow github.com/lib/pq \
+github.com/mattn/go-sqlite3 github.com/go-sql-driver/mysql
 go build
 bin/goslow
 listening on :5103
@@ -129,13 +130,26 @@ time curl localhost:5103/some/url
 10.123 total
 ```
 
-By default goslow stores everything in memory. This means that any
-configuration you made will be lost forever after server restart.
+By default goslow stores data in memory. This means that any
+configuration change you make will be lost after restart.
 You need to pass
---db option to use persistent SQL storage. Currently only postgres is supported.
+*--driver* and *--data-source* options to use RDBMS storage.
+
+Goslow supports sqlite3:
 ```shell
-go get github.com/lib/pq
-bin/goslow --db bin/goslow --db postgres://user@host/dbname
+sqlite3 /path/to/sqlite3/db/file < goslow/sql/schema.sql
+bin/goslow --driver sqlite3 --data-source /path/to/sqlite3/db/file
+```
+... mysql:
+```shell
+mysql -u user dbname < goslow/sql/schema.sql
+bin/goslow --driver mysql --data-source user@host/dbname
+```
+... and postgres:
+```shell
+psql -U user dbname < goslow/sql/schema.sql
+bin/goslow --driver postgres --data-source postgres://user@host/dbname
+# data source prefix 'postgres://' is required
 ```
 
 ## Contributing
@@ -144,7 +158,7 @@ First, we need you to sign a contributor's agreement.
 Second, we need your boss to sign a waiver that she's okay with you
 contributing to goslow.
 
-Just kidding. Open pull requests, send emails with patches/tarballs/links to pastebin
+Just kidding. Open pull requests, send emails with patches/tarballs/links-to-pastebin
 to [codumentary.com@gmail.com](mailto:codumentary.com@gmail.com) Whatever makes you happy.
 
 ## License
