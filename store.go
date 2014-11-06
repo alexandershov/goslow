@@ -6,18 +6,28 @@ import (
 )
 
 type Store interface {
-	AddRule(rule *Rule)
-	GetHostRules(host string) []*Rule
+	AddRule(rule *Rule) error
+	GetHostRules(host string) ([]*Rule, error)
 }
 
-func FindRule(store Store, r *http.Request) (rule *Rule, found bool) {
-	rules := store.GetHostRules(WithoutPort(r.Host))
+func NewStore(driver string, dataSource string) (Store, error) {
+	if driver == "memory" {
+		return NewMemoryStore()
+	}
+	return NewSqlStore(driver, dataSource)
+}
+
+func FindRule(store Store, r *http.Request) (rule *Rule, found bool, err error) {
+	rules, err := store.GetHostRules(WithoutPort(r.Host))
+	if err != nil {
+		return nil, false, err
+	}
 	for _, rule := range rules {
-		if rule.Match(r.URL.Path, r.Method) {
-			return rule, true
+		if rule.Match(r) {
+			return rule, true, nil
 		}
 	}
-	return nil, false
+	return nil, false, nil
 }
 
 func WithoutPort(host string) string {

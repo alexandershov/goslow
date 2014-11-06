@@ -3,11 +3,12 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
+	"fmt"
 	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/lib/pq"
 	_ "github.com/mattn/go-sqlite3"
 	"log"
-	"net/http"
 	"regexp"
 	"time"
 )
@@ -28,29 +29,27 @@ ORDER BY path DESC
 `
 
 type SqlStore struct {
-	Driver   string
-	DataSource  string
-	Db *sql.DB
+	Driver     string
+	DataSource string
+	Db         *sql.DB
 }
 
-func NewSqlStore(driver string, dataSource string) Store {
+func NewSqlStore(driver string, dataSource string) (Store, error) {
 	db, err := sql.Open(driver, dataSource)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 	err = db.Ping()
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
-	return &SqlStore{Driver: driver, DataSource: dataSource, Db: db}
+	return &SqlStore{Driver: driver, DataSource: dataSource, Db: db}, nil
 }
 
-func (store *SqlStore) AddRule(rule *Rule) {
+func (store *SqlStore) AddRule(rule *Rule) error {
 	_, err := store.Db.Exec(store.Agnostic(INSERT_RULE_SQL), rule.Host, rule.Path, rule.Method,
 		MapToJson(rule.Header), rule.Delay, rule.ResponseStatus, rule.Response)
-	if err != nil {
-		log.Fatal(err)
-	}
+	return err
 }
 
 func (store *SqlStore) Agnostic(sql string) string {
@@ -60,36 +59,44 @@ func (store *SqlStore) Agnostic(sql string) string {
 	return AGNOSTIC_SQL.ReplaceAllString(sql, "?")
 }
 
-func (store *SqlStore) GetHostRules(host string) []*Rule {
+func (store *SqlStore) GetHostRules(host string) ([]*Rule, error) {
 	rows, err := store.Db.Query(store.Agnostic(GET_RULES_SQL), host)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 	defer rows.Close()
 	rules := make([]*Rule, 0)
 	for rows.Next() {
-		rules = append(rules, ReadRule(rows))
+		rule, err := ReadRule(rows)
+		if err != nil {
+			return nil, err
+		}
+		rules = append(rules, rule)
 	}
-	return rules
+	return rules, nil
 }
 
-func ReadRule(rows *sql.Rows) *Rule {
+func ReadRule(rows *sql.Rows) (*Rule, error) {
 	rule := new(Rule)
 	var header string
 	var delay int64
 	rows.Scan(&rule.Host, &rule.Path, &rule.Method, &header, &delay, &rule.ResponseStatus,
 		&rule.Response)
-	rule.Header = JsonToMap(header)
+	var err error
+	rule.Header, err = JsonToMap(header)
+	if err != nil {
+		return nil, err
+	}
 	log.Println(rule.Header)
 	rule.Delay = time.Duration(delay)
-	return rule
+	return rule, nil
 }
 
-func JsonToMap(j string) map[string]string {
+func JsonToMap(j string) (map[string]string, error) {
 	parsed := make(map[string]interface{})
 	err := json.Unmarshal([]byte(j), &parsed)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 	m := make(map[string]string)
 	for key, value := range parsed {
@@ -97,32 +104,13 @@ func JsonToMap(j string) map[string]string {
 		case string:
 			m[key] = value.(string)
 		default:
-			log.Fatal("Expecting string, got %T", t)
+			return nil, errors.New(fmt.Sprintf("Expecting string, got %T", t))
 		}
 	}
-	return m
-}
-
-func HeaderToMap(header http.Header) map[string]string {
-	m := make(map[string]string)
-	for key, values := range header {
-		if len(values) != 1 {
-			log.Fatalf("multiple values %s for header key %s", key, values)
-		}
-		m[key] = values[0]
-	}
-	return m
+	return m, nil
 }
 
 func MapToJson(m map[string]string) string {
 	b, _ := json.Marshal(m)
 	return string(b)
-}
-
-func MapToHeader(m map[string]string) http.Header {
-	header := make(map[string][]string)
-	for key, value := range m {
-		header[key] = []string{value}
-	}
-	return header
 }

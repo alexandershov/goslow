@@ -20,20 +20,32 @@ type GoSlowServer struct {
 	Store  Store
 }
 
+func NewGoSlowServer(config *Config) *GoSlowServer {
+	store, err := NewStore(config.Driver, config.DataSource)
+	if err != nil {
+		log.Fatal(err)
+	}
+	server := &GoSlowServer{Config: config, Store: store}
+	if config.AddDefaultRules {
+		server.AddDefaultRules()
+	}
+	return server
+}
+
 func (server *GoSlowServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	log.Printf("%s %s", r.Method, r.URL.Path)
 	AllowCrossDomainRequests(w, r)
 	if r.Method == "OPTIONS" {
 		return
 	}
-	rule, found := FindRule(server.Store, r)
+	rule, found, err := FindRule(server.Store, r)
+	if err != nil {
+		log.Print(err)
+		http.Error(w, "Internal error. For real.", 500)
+		return
+	}
 	if found {
-		log.Printf("sleeping for %v", rule.Delay)
-		time.Sleep(rule.Delay)
-
-		AddHeaders(rule.Header, w)
-		w.WriteHeader(rule.ResponseStatus)
-		io.WriteString(w, rule.Response)
+		ApplyRule(rule, w)
 	} else {
 		io.WriteString(w, DEFAULT_RESPONSE)
 	}
@@ -45,6 +57,15 @@ func AllowCrossDomainRequests(w http.ResponseWriter, r *http.Request) {
 	header.Set("Access-Control-Allow-Origin", "*")
 	header.Set("Access-Control-Allow-Credentials", "true")
 	header["Access-Control-Allow-Headers"] = r.Header["Access-Control-Request-Headers"]
+}
+
+func ApplyRule(rule *Rule, w http.ResponseWriter) {
+	log.Printf("sleeping for %v", rule.Delay)
+	time.Sleep(rule.Delay)
+
+	AddHeaders(rule.Header, w)
+	w.WriteHeader(rule.ResponseStatus)
+	io.WriteString(w, rule.Response)
 }
 
 func AddHeaders(header map[string]string, w http.ResponseWriter) {
@@ -91,7 +112,7 @@ func (server *GoSlowServer) HeaderFor(status int) map[string]string {
 	_, isRedirect := REDIRECT_STATUS[status]
 	if isRedirect {
 		// TODO: check that protocol-independent location is legal HTTP
-    // TODO: header should respect current port
+		// TODO: header should respect current port
 		host := fmt.Sprintf("//%s", server.MakeFullHost(0))
 		return map[string]string{"Location": host}
 	}

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"net/http"
 	"time"
 )
 
@@ -14,8 +15,8 @@ type Rule struct {
 	Response       string
 }
 
-func (rule *Rule) Match(path, method string) bool {
-	return Match(rule.Path, path) && Match(rule.Method, method)
+func (rule *Rule) Match(r *http.Request) bool {
+	return Match(rule.Path, r.URL.Path) && Match(rule.Method, r.Method)
 }
 
 func Match(pattern, name string) bool {

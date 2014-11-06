@@ -8,24 +8,23 @@ import (
 	"reflect"
 )
 
-
 type Config struct {
 	Host            string
 	Address         string
-	Driver              string
-	DataSource          string
+	Driver          string
+	DataSource      string
 	MinKeyLength    int
 	KeySalt         string
 	AddDefaultRules bool
 }
 
 var DEFAULT_CONFIG *Config = &Config{
-	Host: "localhost",
-	Address: ":5103",
-	Driver: "memory",
-	DataSource: "",
-	MinKeyLength: 6,
-	KeySalt: "",
+	Host:            "localhost",
+	Address:         ":5103",
+	Driver:          "memory",
+	DataSource:      "",
+	MinKeyLength:    6,
+	KeySalt:         "",
 	AddDefaultRules: false,
 }
 
