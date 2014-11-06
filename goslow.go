@@ -7,10 +7,10 @@ import (
 func main() {
 	config := NewConfigFromArgs()
 	var store Store
-	if config.Db == "" {
+	if config.Driver == "memory" {
 		store = NewMemoryStore()
 	} else {
-		store = NewSqlStore(config.Db, config.DbConn)
+		store = NewSqlStore(config.Driver, config.DataSource)
 	}
 	server := &GoSlowServer{Config: config, Store: store}
 	if config.AddDefaultRules {

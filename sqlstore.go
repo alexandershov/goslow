@@ -28,25 +28,25 @@ ORDER BY path DESC
 `
 
 type SqlStore struct {
-	Db   string
-	Dsn  string
-	Conn *sql.DB
+	Driver   string
+	DataSource  string
+	Db *sql.DB
 }
 
-func NewSqlStore(db string, dsn string) Store {
-	conn, err := sql.Open(db, dsn)
+func NewSqlStore(driver string, dataSource string) Store {
+	db, err := sql.Open(driver, dataSource)
 	if err != nil {
 		log.Fatal(err)
 	}
-	err = conn.Ping()
+	err = db.Ping()
 	if err != nil {
 		log.Fatal(err)
 	}
-	return &SqlStore{Db: db, Dsn: dsn, Conn: conn}
+	return &SqlStore{Driver: driver, DataSource: dataSource, Db: db}
 }
 
 func (store *SqlStore) AddRule(rule *Rule) {
-	_, err := store.Conn.Exec(store.Agnostic(INSERT_RULE_SQL), rule.Host, rule.Path, rule.Method,
+	_, err := store.Db.Exec(store.Agnostic(INSERT_RULE_SQL), rule.Host, rule.Path, rule.Method,
 		MapToJson(rule.Header), rule.Delay, rule.ResponseStatus, rule.Response)
 	if err != nil {
 		log.Fatal(err)
@@ -54,14 +54,14 @@ func (store *SqlStore) AddRule(rule *Rule) {
 }
 
 func (store *SqlStore) Agnostic(sql string) string {
-	if store.Db == "postgres" {
+	if store.Driver == "postgres" {
 		return sql
 	}
 	return AGNOSTIC_SQL.ReplaceAllString(sql, "?")
 }
 
 func (store *SqlStore) GetHostRules(host string) []*Rule {
-	rows, err := store.Conn.Query(store.Agnostic(GET_RULES_SQL), host)
+	rows, err := store.Db.Query(store.Agnostic(GET_RULES_SQL), host)
 	if err != nil {
 		log.Fatal(err)
 	}

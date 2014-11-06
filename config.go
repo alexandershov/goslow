@@ -8,24 +8,25 @@ import (
 	"reflect"
 )
 
-const (
-	DEFAULT_HOST              = "localhost"
-	DEFAULT_ADDRESS           = ":5103"
-	DEFAULT_DB                = ""
-	DEFAULT_DB_CONN           = ""
-	DEFAULT_MIN_KEY_LENGTH    = 6
-	DEFAULT_KEY_SALT          = ""
-	DEFAULT_ADD_DEFAULT_RULES = false
-)
 
 type Config struct {
 	Host            string
 	Address         string
-	Db              string
-	DbConn          string
+	Driver              string
+	DataSource          string
 	MinKeyLength    int
 	KeySalt         string
 	AddDefaultRules bool
+}
+
+var DEFAULT_CONFIG *Config = &Config{
+	Host: "localhost",
+	Address: ":5103",
+	Driver: "memory",
+	DataSource: "",
+	MinKeyLength: 6,
+	KeySalt: "",
+	AddDefaultRules: false,
 }
 
 func NewConfigFromArgs() *Config {
@@ -44,16 +45,16 @@ func NewConfigFromArgs() *Config {
 }
 
 func DefineFlags(config *Config) {
-	flag.StringVar(&config.Host, "host", DEFAULT_HOST, "deployment host. E.g: localhost")
-	flag.StringVar(&config.Address, "address", DEFAULT_ADDRESS, "address to listen on. E.g: 0.0.0.0:8000")
-	flag.StringVar(&config.Db, "db", DEFAULT_DB, `database. One of: sqlite3, mysql, or postgres.
-	Goslow will use the in-memory store if you don't specify the db`)
-	flag.StringVar(&config.DbConn, "db-conn", DEFAULT_DB_CONN,
-		"database connection string. E.g: postgres://user:password@localhost/dbname")
-	flag.IntVar(&config.MinKeyLength, "min-key-length", DEFAULT_MIN_KEY_LENGTH,
+	flag.StringVar(&config.Host, "host", DEFAULT_CONFIG.Host, "deployment host. E.g: localhost")
+	flag.StringVar(&config.Address, "address", DEFAULT_CONFIG.Address, "address to listen on. E.g: 0.0.0.0:8000")
+	flag.StringVar(&config.Driver, "driver", DEFAULT_CONFIG.Driver, `database driver. One of: memory, sqlite3, mysql, or postgres.
+	Default is memory`)
+	flag.StringVar(&config.DataSource, "data-source", DEFAULT_CONFIG.DataSource,
+		"data source name. E.g: postgres://user:password@localhost/dbname")
+	flag.IntVar(&config.MinKeyLength, "min-key-length", DEFAULT_CONFIG.MinKeyLength,
 		"minimum hashids key length. E.g: 8")
-	flag.StringVar(&config.KeySalt, "key-salt", DEFAULT_KEY_SALT, "hashids key salt. E.g: kj8ioIxZ")
-	flag.BoolVar(&config.AddDefaultRules, "add-default-rules", DEFAULT_ADD_DEFAULT_RULES, "Add default rules?")
+	flag.StringVar(&config.KeySalt, "key-salt", DEFAULT_CONFIG.KeySalt, "hashids key salt. E.g: kj8ioIxZ")
+	flag.BoolVar(&config.AddDefaultRules, "add-default-rules", DEFAULT_CONFIG.AddDefaultRules, "Add default rules?")
 }
 
 func AddConfigFromFile(path string, config *Config) *Config {
@@ -122,8 +123,5 @@ func Contains(items []string, elem string) bool {
 }
 
 func (config *Config) HasNonDefaultValue() bool {
-	return config.Host != DEFAULT_HOST || config.Address != DEFAULT_ADDRESS ||
-		config.Db != DEFAULT_DB || config.DbConn != DEFAULT_DB_CONN ||
-		config.MinKeyLength != DEFAULT_MIN_KEY_LENGTH || config.KeySalt != DEFAULT_KEY_SALT ||
-		config.AddDefaultRules != DEFAULT_ADD_DEFAULT_RULES
+	return *config != *DEFAULT_CONFIG
 }

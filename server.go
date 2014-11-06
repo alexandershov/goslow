@@ -91,6 +91,7 @@ func (server *GoSlowServer) HeaderFor(status int) map[string]string {
 	_, isRedirect := REDIRECT_STATUS[status]
 	if isRedirect {
 		// TODO: check that protocol-independent location is legal HTTP
+    // TODO: header should respect current port
 		host := fmt.Sprintf("//%s", server.MakeFullHost(0))
 		return map[string]string{"Location": host}
 	}
