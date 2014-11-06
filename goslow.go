@@ -10,7 +10,7 @@ func main() {
 	if config.Db == "" {
 		store = NewMemoryStore()
 	} else {
-		store = NewSqlStore(config.Db)
+		store = NewSqlStore(config.Db, config.DbConn)
 	}
 	server := &GoSlowServer{Config: config, Store: store}
 	if config.AddDefaultRules {

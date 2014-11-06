@@ -3,11 +3,16 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
+	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/lib/pq"
+	_ "github.com/mattn/go-sqlite3"
 	"log"
 	"net/http"
+	"regexp"
 	"time"
 )
+
+var AGNOSTIC_SQL *regexp.Regexp = regexp.MustCompile("\\$\\d+")
 
 const INSERT_RULE_SQL = `
 INSERT INTO rules
@@ -23,28 +28,40 @@ ORDER BY path DESC
 `
 
 type SqlStore struct {
-	Db *sql.DB
+	Db   string
+	Dsn  string
+	Conn *sql.DB
 }
 
-func NewSqlStore(uri string) Store {
-	db, err := sql.Open("postgres", uri)
+func NewSqlStore(db string, dsn string) Store {
+	conn, err := sql.Open(db, dsn)
 	if err != nil {
 		log.Fatal(err)
 	}
-	return &SqlStore{Db: db}
+	err = conn.Ping()
+	if err != nil {
+		log.Fatal(err)
+	}
+	return &SqlStore{Db: db, Dsn: dsn, Conn: conn}
 }
 
 func (store *SqlStore) AddRule(rule *Rule) {
-	rows, err := store.Db.Query(INSERT_RULE_SQL, rule.Host, rule.Path, rule.Method,
+	_, err := store.Conn.Exec(store.Agnostic(INSERT_RULE_SQL), rule.Host, rule.Path, rule.Method,
 		MapToJson(rule.Header), rule.Delay, rule.ResponseStatus, rule.Response)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer rows.Close()
+}
+
+func (store *SqlStore) Agnostic(sql string) string {
+	if store.Db == "postgres" {
+		return sql
+	}
+	return AGNOSTIC_SQL.ReplaceAllString(sql, "?")
 }
 
 func (store *SqlStore) GetHostRules(host string) []*Rule {
-	rows, err := store.Db.Query(GET_RULES_SQL, host)
+	rows, err := store.Conn.Query(store.Agnostic(GET_RULES_SQL), host)
 	if err != nil {
 		log.Fatal(err)
 	}
