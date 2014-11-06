@@ -2,8 +2,8 @@ package main
 
 import (
 	"database/sql"
+	"encoding/json"
 	_ "github.com/lib/pq"
-	"github.com/lib/pq/hstore"
 	"log"
 	"net/http"
 	"time"
@@ -35,11 +35,12 @@ func NewSqlStore(uri string) Store {
 }
 
 func (store *SqlStore) AddRule(rule *Rule) {
-	_, err := store.Db.Query(INSERT_RULE_SQL, rule.Host, rule.Path, rule.Method,
-		MapToHstore(rule.Header), rule.Delay, rule.ResponseStatus, rule.Response)
+	rows, err := store.Db.Query(INSERT_RULE_SQL, rule.Host, rule.Path, rule.Method,
+		MapToJson(rule.Header), rule.Delay, rule.ResponseStatus, rule.Response)
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer rows.Close()
 }
 
 func (store *SqlStore) GetHostRules(host string) []*Rule {
@@ -57,22 +58,30 @@ func (store *SqlStore) GetHostRules(host string) []*Rule {
 
 func ReadRule(rows *sql.Rows) *Rule {
 	rule := new(Rule)
-	header := hstore.Hstore{make(map[string]sql.NullString)}
+	var header string
 	var delay int64
 	rows.Scan(&rule.Host, &rule.Path, &rule.Method, &header, &delay, &rule.ResponseStatus,
 		&rule.Response)
-	rule.Header = HstoreToMap(header)
+	rule.Header = JsonToMap(header)
+	log.Println(rule.Header)
 	rule.Delay = time.Duration(delay)
 	return rule
 }
 
-func HstoreToMap(hs hstore.Hstore) map[string]string {
+func JsonToMap(j string) map[string]string {
+	parsed := make(map[string]interface{})
+	err := json.Unmarshal([]byte(j), &parsed)
+	if err != nil {
+		log.Fatal(err)
+	}
 	m := make(map[string]string)
-	for key, value := range hs.Map {
-		if !value.Valid {
-			log.Fatalf("NULL value for hstore key <%s>", key)
+	for key, value := range parsed {
+		switch t := value.(type) {
+		case string:
+			m[key] = value.(string)
+		default:
+			log.Fatal("Expecting string, got %T", t)
 		}
-		m[key] = value.String
 	}
 	return m
 }
@@ -88,12 +97,9 @@ func HeaderToMap(header http.Header) map[string]string {
 	return m
 }
 
-func MapToHstore(m map[string]string) hstore.Hstore {
-	nullMap := make(map[string]sql.NullString)
-	for key, value := range m {
-		nullMap[key] = sql.NullString{String: value, Valid: true}
-	}
-	return hstore.Hstore{nullMap}
+func MapToJson(m map[string]string) string {
+	b, _ := json.Marshal(m)
+	return string(b)
 }
 
 func MapToHeader(m map[string]string) http.Header {

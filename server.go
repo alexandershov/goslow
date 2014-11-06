@@ -39,6 +39,7 @@ func (server *GoSlowServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// TODO: check crossbrowser compatibility
 func AllowCrossDomainRequests(w http.ResponseWriter, r *http.Request) {
 	header := w.Header()
 	header.Set("Access-Control-Allow-Origin", "*")
