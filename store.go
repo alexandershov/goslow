@@ -7,6 +7,8 @@ import (
 
 type Store interface {
 	AddRule(rule *Rule) error
+	AddNewDomain(domain string) error
+	ContainsDomain(domain string) (bool, error)
 	GetHostRules(host string) ([]*Rule, error)
 }
 

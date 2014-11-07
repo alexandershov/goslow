@@ -28,6 +28,18 @@ WHERE host = $1
 ORDER BY path DESC
 `
 
+const INSERT_DOMAIN_SQL = `
+INSERT INTO domains
+(domain)
+VALUES ($1)
+`
+
+const GET_DOMAIN_SQL = `
+SELECT *
+FROM domains
+WHERE domain = $1
+`
+
 type SqlStore struct {
 	Driver     string
 	DataSource string
@@ -113,4 +125,18 @@ func JsonToMap(j string) (map[string]string, error) {
 func MapToJson(m map[string]string) string {
 	b, _ := json.Marshal(m)
 	return string(b)
+}
+
+func (store *SqlStore) AddNewDomain(domain string) error {
+	_, err := store.Db.Exec(store.Agnostic(INSERT_DOMAIN_SQL), domain)
+	return err
+}
+
+func (store *SqlStore) ContainsDomain(domain string) (bool, error) {
+	rows, err := store.Db.Query(store.Agnostic(GET_DOMAIN_SQL), domain)
+	if err != nil {
+		return false, err
+	}
+	defer rows.Close()
+	return rows.Next(), nil
 }
