@@ -9,6 +9,7 @@ import (
 	"github.com/speps/go-hashids"
 	"log"
 	"net/http"
+  "net/url"
 	"time"
 )
 
@@ -30,7 +31,7 @@ func NewGoSlowServer(config *Config) *GoSlowServer {
 	if err != nil {
 		log.Fatal(err)
 	}
-	
+
 	server := &GoSlowServer{Config: config, Store: store,
 		Hasher: NewHasher(config.KeySalt, config.MinKeyLength)}
 	if config.AddDefaultRules {
@@ -56,6 +57,9 @@ func (server *GoSlowServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case GetSubdomain(r.Host) == "create" && r.Method == "POST":
 		server.HandleCreateSubdomain(w, r)
 		return
+  case strings.HasPrefix(r.Host, "admin-") && r.Method == "POST":
+  server.AddRuleFromRequest(strings.TrimPrefix(GetSubdomain(r.Host), "admin-"), w, r)
+      return
 	}
 	rule, found, err := FindRule(server.Store, r)
 	if err != nil {
@@ -66,7 +70,7 @@ func (server *GoSlowServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if found {
 		ApplyRule(rule, w)
 	} else {
-		io.WriteString(w, DEFAULT_RESPONSE)
+		http.Error(w, "No rule. For real.", 404)
 	}
 }
 
@@ -84,20 +88,39 @@ func GetSubdomain(url string) string {
 
 func (server *GoSlowServer) HandleCreateSubdomain(w http.ResponseWriter, r *http.Request) {
 	subdomain, err := server.AddNewSubdomain(5)
+
 	if err == nil {
+    server.AddRuleFromRequest(subdomain, w, r)
+  } else {
+    io.WriteString(w, fmt.Sprintf("ERROR: %s", err))
+  }
+}
+
+func (server *GoSlowServer) AddRuleFromRequest(subdomain string, w http.ResponseWriter, r *http.Request) {
 		payload, err := ioutil.ReadAll(r.Body)
-		var delay = 0
-		delay, err = strconv.Atoi(r.FormValue("delay"))
+    if err != nil {
+      io.WriteString(w, fmt.Sprintf("ERROR: %s", err))
+      return
+    }
+
+    values, err := url.ParseQuery(r.URL.RawQuery)
+    if err != nil {
+      io.WriteString(w, fmt.Sprintf("ERROR: %s", err))
+      return
+    }
+		delay := 0
+    path := r.URL.Path
+		delay, _ = strconv.Atoi(values.Get("delay"))
+    if _, hasPath := values["path"]; hasPath {
+      path = values.Get("path")
+    }
 		host := server.MakeFullHost(subdomain)
 		err = server.Store.AddRule(&Rule{Host: host, ResponseStatus: 200, Header: EmptyHeader(),
-			Path: r.URL.Path,
+			Path: path, Method: values.Get("method"),
 			Response: string(payload), Delay: time.Duration(delay) * time.Second})
 		log.Print(err)
 		io.WriteString(w, fmt.Sprintf("Created domain %s\n", subdomain))
-	} else {
-		io.WriteString(w, fmt.Sprintf("ERROR: %s", err))
 	}
-}
 
 func (server *GoSlowServer) AddNewSubdomain(maxAttempts int) (string, error) {
 	for {

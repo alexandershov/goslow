@@ -23,10 +23,19 @@ func (store *MemoryStore) AddRule(rule *Rule) error {
 	if !contains {
 		rules = make([]*Rule, 0)
 	}
+	for i, r := range rules {
+		if SameRule(r, rule) {
+			rules = append(rules[:i], rules[i+1:]...)
+		}
+	}
 	rules = append(rules, rule)
 	store.rules[rule.Host] = rules
 	sort.Sort(RulesByPathLen(rules))
 	return nil
+}
+
+func SameRule(x *Rule, y *Rule) bool {
+	return x.Host == y.Host && x.Path == y.Path && x.Method == y.Method
 }
 
 func (store *MemoryStore) GetHostRules(host string) ([]*Rule, error) {

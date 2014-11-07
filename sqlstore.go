@@ -15,6 +15,11 @@ import (
 
 var AGNOSTIC_SQL *regexp.Regexp = regexp.MustCompile("\\$\\d+")
 
+const DELETE_RULE_SQL = `
+DELETE FROM rules
+WHERE host = $1 AND path = $2 AND method = $3
+`
+
 const INSERT_RULE_SQL = `
 INSERT INTO rules
 (host, path, method, header, delay, response_status, response)
@@ -59,7 +64,11 @@ func NewSqlStore(driver string, dataSource string) (Store, error) {
 }
 
 func (store *SqlStore) AddRule(rule *Rule) error {
-	_, err := store.Db.Exec(store.Agnostic(INSERT_RULE_SQL), rule.Host, rule.Path, rule.Method,
+	_, err := store.Db.Exec(store.Agnostic(DELETE_RULE_SQL), rule.Host, rule.Path, rule.Method)
+	if err != nil {
+			return err
+	}
+	_, err = store.Db.Exec(store.Agnostic(INSERT_RULE_SQL), rule.Host, rule.Path, rule.Method,
 		MapToJson(rule.Header), rule.Delay, rule.ResponseStatus, rule.Response)
 	return err
 }
