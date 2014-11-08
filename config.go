@@ -9,60 +9,64 @@ import (
 )
 
 type Config struct {
-	Host            string
-	Address         string
-	Driver          string
-	DataSource      string
-	MinKeyLength    int
-	KeySalt         string
-	AddDefaultRules bool
+	address          string
+	driver           string
+	dataSource       string
+	minKeyLength     int
+	keySalt          string
+	createDefaultRules  bool
+	singleDomainUrlPath string
 }
 
 var DEFAULT_CONFIG *Config = &Config{
-	Host:            "localhost",
-	Address:         ":5103",
-	Driver:          "memory",
-	DataSource:      "",
-	MinKeyLength:    6,
-	KeySalt:         "",
-	AddDefaultRules: false,
+	address:          ":5103",
+	driver:           "memory",
+	dataSource:       "",
+	minKeyLength:     6,
+	keySalt:          "",
+	createDefaultRules:  false,
+	singleDomainUrlPath: "/goslow/",
 }
 
 func NewConfigFromArgs() *Config {
 	config := new(Config)
-	DefineFlags(config)
+	defineFlags(config)
 	// TODO: think about making configPath a field in the Config struct
 	configPath := flag.String("config", "", "path to config file. E.g: /path/to/config.json")
 	flag.Parse()
 	if *configPath != "" {
-		if config.HasNonDefaultValue() {
+		if config.hasNonDefaultValue() {
 			log.Fatal("You can't mix -config option with other options")
 		}
-		return AddConfigFromFile(*configPath, config)
+		config.mergeWithFile(*configPath)
 	}
 	return config
 }
 
-func DefineFlags(config *Config) {
-	flag.StringVar(&config.Host, "host", DEFAULT_CONFIG.Host, "deployment host. E.g: localhost")
-	flag.StringVar(&config.Address, "address", DEFAULT_CONFIG.Address, "address to listen on. E.g: 0.0.0.0:8000")
-	flag.StringVar(&config.Driver, "driver", DEFAULT_CONFIG.Driver, `database driver. One of: memory, sqlite3, mysql, or postgres.
+func defineFlags(config *Config) {
+	flag.StringVar(&config.address, "address", DEFAULT_CONFIG.address, "address to listen on. E.g: 0.0.0.0:8000")
+	flag.StringVar(&config.driver, "driver", DEFAULT_CONFIG.driver, `database driver. One of: memory, sqlite3, mysql, or postgres.
 	Default is memory`)
-	flag.StringVar(&config.DataSource, "data-source", DEFAULT_CONFIG.DataSource,
+	flag.StringVar(&config.dataSource, "data-source", DEFAULT_CONFIG.dataSource,
 		"data source name. E.g: postgres://user:password@localhost/dbname")
-	flag.IntVar(&config.MinKeyLength, "min-key-length", DEFAULT_CONFIG.MinKeyLength,
+	flag.IntVar(&config.minKeyLength, "min-key-length", DEFAULT_CONFIG.minKeyLength,
 		"minimum hashids key length. E.g: 8")
-	flag.StringVar(&config.KeySalt, "key-salt", DEFAULT_CONFIG.KeySalt, "hashids key salt. E.g: kj8ioIxZ")
-	flag.BoolVar(&config.AddDefaultRules, "add-default-rules", DEFAULT_CONFIG.AddDefaultRules, "Add default rules?")
+	flag.StringVar(&config.keySalt, "key-salt", DEFAULT_CONFIG.keySalt, "hashids key salt. E.g: kj8ioIxZ")
+	flag.BoolVar(&config.createDefaultRules, "create-default-rules", DEFAULT_CONFIG.createDefaultRules, "Create default rules?")
+	flag.StringVar(&config.singleDomainUrlPath, "single-domain-url-path", DEFAULT_CONFIG.singleDomainUrlPath,
+		"Run in single domain mode, use localhost/goslow for configuration")
 }
 
-func AddConfigFromFile(path string, config *Config) *Config {
-	ValidateConfig(path)
-	Unmarshal(path, config)
+
+// TODO: options in JSON config should be named the same as cmd options
+// i.e min-key-length, not minKeyLength
+func (config *Config) mergeWithFile(path string) *Config {
+	validateConfig(path)
+	unmarshal(path, config)
 	return config
 }
 
-func Unmarshal(path string, i interface{}) {
+func unmarshal(path string, i interface{}) {
 	bytes, err := ioutil.ReadFile(path)
 	if err != nil {
 		log.Fatalf("Can't read config %s: %v", path, err)
@@ -73,21 +77,21 @@ func Unmarshal(path string, i interface{}) {
 	}
 }
 
-func ValidateConfig(path string) {
+func validateConfig(path string) {
 	m := make(map[string]interface{})
-	Unmarshal(path, &m)
-	knownFields := GetConfigFieldNames()
-	key, foundUnknown := FindUnknownField(m, knownFields)
+	unmarshal(path, &m)
+	knownFields := getConfigFieldNames()
+	key, foundUnknown := findUnknownField(m, knownFields)
 	if foundUnknown {
 		log.Fatalf("Found unknown key <%s> in config %s. Allowed keys: %s", key, path, knownFields)
 	}
 }
 
-func GetConfigFieldNames() []string {
-	return GetStructFieldNames(reflect.TypeOf(Config{}))
+func getConfigFieldNames() []string {
+	return getStructFieldNames(reflect.TypeOf(Config{}))
 }
 
-func GetStructFieldNames(typ reflect.Type) []string {
+func getStructFieldNames(typ reflect.Type) []string {
 	fields := make([]string, 0, typ.NumField())
 	for i := 0; i < typ.NumField(); i++ {
 		fields = append(fields, typ.Field(i).Name)
@@ -95,16 +99,16 @@ func GetStructFieldNames(typ reflect.Type) []string {
 	return fields
 }
 
-func FindUnknownField(m map[string]interface{}, knownFields []string) (key string, foundUnknown bool) {
-	for _, key := range GetMapKeys(m) {
-		if !Contains(knownFields, key) {
+func findUnknownField(m map[string]interface{}, knownFields []string) (key string, foundUnknown bool) {
+	for _, key := range getMapKeys(m) {
+		if !contains(knownFields, key) {
 			return key, true
 		}
 	}
 	return "", false
 }
 
-func GetMapKeys(m map[string]interface{}) []string {
+func getMapKeys(m map[string]interface{}) []string {
 	keys := make([]string, 0, len(m))
 	for key := range m {
 		keys = append(keys, key)
@@ -112,7 +116,7 @@ func GetMapKeys(m map[string]interface{}) []string {
 	return keys
 }
 
-func Contains(items []string, elem string) bool {
+func contains(items []string, elem string) bool {
 	for _, item := range items {
 		if item == elem {
 			return true
@@ -121,6 +125,6 @@ func Contains(items []string, elem string) bool {
 	return false
 }
 
-func (config *Config) HasNonDefaultValue() bool {
+func (config *Config) hasNonDefaultValue() bool {
 	return *config != *DEFAULT_CONFIG
 }

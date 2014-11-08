@@ -2,14 +2,14 @@ package main
 
 import (
 	"fmt"
+	"github.com/speps/go-hashids"
 	"io"
 	"io/ioutil"
-	"strings"
-	"strconv"
-	"github.com/speps/go-hashids"
 	"log"
 	"net/http"
-  "net/url"
+	"net/url"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -22,20 +22,25 @@ var REDIRECT_STATUS map[int]bool = map[int]bool{301: true, 302: true}
 
 type GoSlowServer struct {
 	Config *Config
-	Store  Store
+	Store  *Store
 	Hasher *hashids.HashID
 }
 
 func NewGoSlowServer(config *Config) *GoSlowServer {
-	store, err := NewStore(config.Driver, config.DataSource)
+	store, err := NewStore(config.driver, config.dataSource)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	server := &GoSlowServer{Config: config, Store: store,
-		Hasher: NewHasher(config.KeySalt, config.MinKeyLength)}
-	if config.AddDefaultRules {
-		server.AddDefaultRules()
+		Hasher: NewHasher(config.keySalt, config.minKeyLength)}
+	if config.createDefaultRules {
+		if config.singleDomainUrlPath != "" {
+			log.Fatal("You can't use both --single-domain-path and --create-default-rules options")
+
+		} else {
+			server.CreateDefaultRules()
+		}
 	}
 	return server
 }
@@ -54,14 +59,15 @@ func (server *GoSlowServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case r.Method == "OPTIONS":
 		return
-	case GetSubdomain(r.Host) == "create" && r.Method == "POST":
+	case server.IsCreateRequest(r):
 		server.HandleCreateSubdomain(w, r)
 		return
-  case strings.HasPrefix(r.Host, "admin-") && r.Method == "POST":
-  server.AddRuleFromRequest(strings.TrimPrefix(GetSubdomain(r.Host), "admin-"), w, r)
-      return
+	case server.IsConfigRequest(r):
+  log.Printf("Got config request, key: <%s>", server.GetKey(r))
+		server.CreateRuleFromRequest(server.GetKey(r), w, r)
+		return
 	}
-	rule, found, err := FindRule(server.Store, r)
+	rule, found, err := server.Store.FindRule(server.GetKey(r), r)
 	if err != nil {
 		log.Print(err)
 		http.Error(w, "Internal error. For real.", 500)
@@ -72,6 +78,42 @@ func (server *GoSlowServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	} else {
 		http.Error(w, "No rule. For real.", 404)
 	}
+}
+
+func (server *GoSlowServer) IsCreateRequest(r *http.Request) bool {
+	if r.Method != "POST" {
+		return false
+	}
+
+	if server.IsSingleDomain() {
+		return false
+	}
+	return GetSubdomain(r.Host) == "create"
+}
+
+func (server *GoSlowServer) IsConfigRequest(r *http.Request) bool {
+	if r.Method != "POST" {
+		return false
+	}
+	if server.IsSingleDomain() {
+		return strings.HasPrefix(r.URL.Path, server.Config.singleDomainUrlPath)
+
+	}
+	return strings.HasPrefix(GetSubdomain(r.Host), "admin-")
+}
+
+func (server *GoSlowServer) IsSingleDomain() bool {
+	return server.Config.singleDomainUrlPath != ""
+}
+
+func (server *GoSlowServer) GetKey(r *http.Request) string {
+	if server.IsSingleDomain() {
+		return ""
+	}
+  if server.IsConfigRequest(r) {
+	return strings.TrimPrefix(GetSubdomain(r.Host), "admin-")
+}
+return GetSubdomain(r.Host)
 }
 
 // TODO: check crossbrowser compatibility
@@ -87,45 +129,48 @@ func GetSubdomain(url string) string {
 }
 
 func (server *GoSlowServer) HandleCreateSubdomain(w http.ResponseWriter, r *http.Request) {
-	subdomain, err := server.AddNewSubdomain(5)
+	subdomain, err := server.CreateNewSubdomain(5)
 
 	if err == nil {
-    server.AddRuleFromRequest(subdomain, w, r)
-  } else {
-    io.WriteString(w, fmt.Sprintf("ERROR: %s", err))
-  }
+		server.CreateRuleFromRequest(subdomain, w, r)
+	} else {
+		io.WriteString(w, fmt.Sprintf("ERROR: %s", err))
+	}
 }
 
-func (server *GoSlowServer) AddRuleFromRequest(subdomain string, w http.ResponseWriter, r *http.Request) {
-		payload, err := ioutil.ReadAll(r.Body)
-    if err != nil {
-      io.WriteString(w, fmt.Sprintf("ERROR: %s", err))
-      return
-    }
-
-    values, err := url.ParseQuery(r.URL.RawQuery)
-    if err != nil {
-      io.WriteString(w, fmt.Sprintf("ERROR: %s", err))
-      return
-    }
-		delay := 0
-    path := r.URL.Path
-		delay, _ = strconv.Atoi(values.Get("delay"))
-    if _, hasPath := values["path"]; hasPath {
-      path = values.Get("path")
-    }
-		host := server.MakeFullHost(subdomain)
-		err = server.Store.AddRule(&Rule{Host: host, ResponseStatus: 200, Header: EmptyHeader(),
-			Path: path, Method: values.Get("method"),
-			Response: string(payload), Delay: time.Duration(delay) * time.Second})
-		log.Print(err)
-		io.WriteString(w, fmt.Sprintf("Created domain %s\n", subdomain))
+func (server *GoSlowServer) CreateRuleFromRequest(subdomain string, w http.ResponseWriter, r *http.Request) {
+	payload, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		io.WriteString(w, fmt.Sprintf("ERROR: %s", err))
+		return
 	}
 
-func (server *GoSlowServer) AddNewSubdomain(maxAttempts int) (string, error) {
+	values, err := url.ParseQuery(r.URL.RawQuery)
+	if err != nil {
+		io.WriteString(w, fmt.Sprintf("ERROR: %s", err))
+		return
+	}
+	delay := 0
+	path := server.GetConfigPath(r)
+	delay, _ = strconv.Atoi(values.Get("delay"))
+	err = server.Store.CreateRule(&Rule{host: subdomain, responseStatus: 200, header: EmptyHeader(),
+		path: path, method: values.Get("method"),
+		response: string(payload), delay: time.Duration(delay) * time.Second})
+	log.Print(err)
+	io.WriteString(w, fmt.Sprintf("Created domain %s\n", subdomain))
+}
+
+func (server *GoSlowServer) GetConfigPath(r *http.Request) string {
+  if server.IsSingleDomain() {
+    return "/" + strings.TrimPrefix(r.URL.Path, server.Config.singleDomainUrlPath)
+  }
+  return r.URL.Path
+}
+
+func (server *GoSlowServer) CreateNewSubdomain(maxAttempts int) (string, error) {
 	for {
 		subdomain := server.GenerateSubdomainName()
-		err := server.Store.AddNewDomain(subdomain)
+		err := server.Store.CreateSite(subdomain)
 		if err == nil {
 			return subdomain, nil
 		}
@@ -137,7 +182,6 @@ func (server *GoSlowServer) AddNewSubdomain(maxAttempts int) (string, error) {
 	}
 }
 
-
 func (server *GoSlowServer) GenerateSubdomainName() string {
 	nanoseconds := time.Now().UTC().UnixNano()
 	totalSeconds := int(nanoseconds / 1000000000)
@@ -146,14 +190,13 @@ func (server *GoSlowServer) GenerateSubdomainName() string {
 	return hash
 }
 
-
 func ApplyRule(rule *Rule, w http.ResponseWriter) {
-	log.Printf("sleeping for %v", rule.Delay)
-	time.Sleep(rule.Delay)
+	log.Printf("sleeping for %v", rule.delay)
+	time.Sleep(rule.delay)
 
-	AddHeaders(rule.Header, w)
-	w.WriteHeader(rule.ResponseStatus)
-	io.WriteString(w, rule.Response)
+	AddHeaders(rule.header, w)
+	w.WriteHeader(rule.responseStatus)
+	io.WriteString(w, rule.response)
 }
 
 func AddHeaders(header map[string]string, w http.ResponseWriter) {
@@ -163,36 +206,32 @@ func AddHeaders(header map[string]string, w http.ResponseWriter) {
 	}
 }
 
-func (server *GoSlowServer) AddDefaultRules() {
-	server.AddDelayRules()
-	server.AddStatusRules()
+func (server *GoSlowServer) CreateDefaultRules() {
+	server.CreateDelayRules()
+	server.CreateStatusRules()
 }
 
-func (server *GoSlowServer) AddDelayRules() {
+func (server *GoSlowServer) CreateDelayRules() {
 	for delay := 0; delay <= MAX_DELAY; delay++ {
-		delayHost := server.MakeFullHost(strconv.Itoa(delay))
+		delayHost := strconv.Itoa(delay)
 		delayInSeconds := time.Duration(delay) * time.Second
 
-		server.Store.AddRule(&Rule{Host: delayHost, Header: EmptyHeader(), Delay: delayInSeconds,
-			ResponseStatus: 200, Response: DEFAULT_RESPONSE,
+		server.Store.CreateRule(&Rule{host: delayHost, header: EmptyHeader(), delay: delayInSeconds,
+			responseStatus: 200, response: DEFAULT_RESPONSE,
 		})
 	}
-}
-
-func (server *GoSlowServer) MakeFullHost(subdomain string) string {
-	return fmt.Sprintf("%s.%s", subdomain, server.Config.Host)
 }
 
 func EmptyHeader() map[string]string {
 	return make(map[string]string)
 }
 
-func (server *GoSlowServer) AddStatusRules() {
+func (server *GoSlowServer) CreateStatusRules() {
 	for status := MIN_STATUS; status <= MAX_STATUS; status++ {
-		statusHost := server.MakeFullHost(strconv.Itoa(status))
+		statusHost := strconv.Itoa(status)
 		header := server.HeaderFor(status)
-		server.Store.AddRule(&Rule{Host: statusHost, ResponseStatus: status,
-			Header: header, Response: DEFAULT_RESPONSE})
+		server.Store.CreateRule(&Rule{host: statusHost, responseStatus: status,
+			header: header, response: DEFAULT_RESPONSE})
 	}
 }
 
@@ -201,13 +240,13 @@ func (server *GoSlowServer) HeaderFor(status int) map[string]string {
 	if isRedirect {
 		// TODO: check that protocol-independent location is legal HTTP
 		// TODO: header should respect current port
-		host := fmt.Sprintf("//%s", server.MakeFullHost("0"))
+		host := fmt.Sprintf("//0.goslow.link")
 		return map[string]string{"Location": host}
 	}
 	return EmptyHeader()
 }
 
 func (server *GoSlowServer) ListenAndServe() error {
-	log.Printf("listening on %s", server.Config.Address)
-	return http.ListenAndServe(server.Config.Address, server)
+	log.Printf("listening on %s", server.Config.address)
+	return http.ListenAndServe(server.Config.address, server)
 }
