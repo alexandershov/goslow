@@ -55,20 +55,19 @@ Internal Server Error
 
 
 ## Not-so-quick start
-If you want to get real (not canned) JSON response things'll be a little ugly.
-
-First you need to, ahem, register. Registration is just a POST request
-to **new.goslow.link**
+If you want to get real (not canned) JSON response, then you need to, ahem, register.
+Registration is just a POST request
+to **create.goslow.link**.
 
 ```shell
-echo '{"my": "response"}' | curl -d @- new.goslow.link/users?delay=5
+echo '{"my": "response"}' | curl -d @- create.goslow.link/users?delay=5
 Your goslow domain is: dk8kjs.goslow.link
 ...
 ```
 
-When you do the POST request for real, you'll get a domain different
-from dk8kjs.goslow.link. For the sake of example let's assume that your
-personal domain is dk8kjs.goslow.link.
+When you do the POST request for real, you'll get a domain name different
+from the **dk8kjs.goslow.link**. For the sake of example let's assume that randomly
+generated domain name is **dk8kjs.goslow.link**.
 
 Now you can send requests to your domain:
 ```shell
@@ -101,21 +100,29 @@ time curl -d @- dk8kjs.goslow.link/users
 If you think that relying on unprotected-by-passwords third-party-domains is a
 bad idea, then you're absolutely right.
 
-You can install goslow on your own server:
+You can install goslow locally. You'll need the [golang](https://golang.org/) compiler to build it.
 
 ```shell
+# install dependencies
 go get github.com/alexandershov/goslow github.com/lib/pq \
-github.com/mattn/go-sqlite3 github.com/go-sql-driver/mysql
-go build
+github.com/mattn/go-sqlite3 github.com/go-sql-driver/mysql \
+github.com/speps/go-hashids
+
+# build
+go install github.com/alexandershov/goslow
+
+# run
 bin/goslow
 listening on :5103
 ```
 
-And configure it with POST requests
+Local install of goslow runs in single domain mode
+since nobody wants to deal with dynamically generated subdomain names on local machine.
+You can configure goslow with the POST requests to /goslow/.
 ```shell
-echo '{"local": "response"}' | curl -d @- localhost:5103/goslow/local?delay=4
-localhost:5103/goslow/local will now respond with 4 seconds delay.
-Response is echo '{"local": "response"}'
+echo '{"local": "response"}' | curl -d @- localhost:5103/goslow/feed?delay=4.3
+/feed is now responding with 4.3 seconds delay.
+Response is {"local": "response"}
 ```
 
 You can also proxy goslow requests directly to your API with extra delay:
@@ -123,7 +130,7 @@ You can also proxy goslow requests directly to your API with extra delay:
 echo 'http://your.api' | curl -d @- localhost:5103/goslow?proxy&delay=10
 ```
 
-It works as expected:
+
 ```shell
 time curl localhost:5103/some/url
 # proxies to http://your.api/some/url
