@@ -153,9 +153,9 @@ func (server *GoSlowServer) CreateRuleFromRequest(subdomain string, w http.Respo
 	delay := 0
 	path := server.GetConfigPath(r)
 	delay, _ = strconv.Atoi(values.Get("delay"))
-	err = server.Store.CreateRule(&Rule{host: subdomain, responseStatus: 200, header: EmptyHeader(),
+	err = server.Store.CreateRule(&Rule{site: subdomain, responseStatus: 200, headers: EmptyHeader(),
 		path: path, method: values.Get("method"),
-		response: string(payload), delay: time.Duration(delay) * time.Second})
+		responseBody: string(payload), delay: time.Duration(delay) * time.Second})
 	log.Print(err)
 	io.WriteString(w, fmt.Sprintf("Created domain %s\n", subdomain))
 }
@@ -194,9 +194,9 @@ func ApplyRule(rule *Rule, w http.ResponseWriter) {
 	log.Printf("sleeping for %v", rule.delay)
 	time.Sleep(rule.delay)
 
-	AddHeaders(rule.header, w)
+	AddHeaders(rule.headers, w)
 	w.WriteHeader(rule.responseStatus)
-	io.WriteString(w, rule.response)
+	io.WriteString(w, rule.responseBody)
 }
 
 func AddHeaders(header map[string]string, w http.ResponseWriter) {
@@ -216,8 +216,8 @@ func (server *GoSlowServer) CreateDelayRules() {
 		delayHost := strconv.Itoa(delay)
 		delayInSeconds := time.Duration(delay) * time.Second
 
-		server.Store.CreateRule(&Rule{host: delayHost, header: EmptyHeader(), delay: delayInSeconds,
-			responseStatus: 200, response: DEFAULT_RESPONSE,
+		server.Store.CreateRule(&Rule{site: delayHost, headers: EmptyHeader(), delay: delayInSeconds,
+			responseStatus: 200, responseBody: DEFAULT_RESPONSE,
 		})
 	}
 }
@@ -230,8 +230,8 @@ func (server *GoSlowServer) CreateStatusRules() {
 	for status := MIN_STATUS; status <= MAX_STATUS; status++ {
 		statusHost := strconv.Itoa(status)
 		header := server.HeaderFor(status)
-		server.Store.CreateRule(&Rule{host: statusHost, responseStatus: status,
-			header: header, response: DEFAULT_RESPONSE})
+		server.Store.CreateRule(&Rule{site: statusHost, responseStatus: status,
+			headers: header, responseBody: DEFAULT_RESPONSE})
 	}
 }
 

@@ -6,13 +6,13 @@ import (
 )
 
 type Rule struct {
-	host           string
+	site           string
 	path           string
 	method         string
-	header         map[string]string
+	headers         map[string]string
 	delay         time.Duration
 	responseStatus int
-	response       string
+	responseBody      string
 }
 
 func (rule *Rule) Match(r *http.Request) bool {

@@ -17,32 +17,32 @@ var AGNOSTIC_SQL *regexp.Regexp = regexp.MustCompile("\\$\\d+")
 
 const DELETE_RULE_SQL = `
 DELETE FROM rules
-WHERE host = $1 AND path = $2 AND method = $3
+WHERE site = $1 AND path = $2 AND method = $3
 `
 
 const INSERT_RULE_SQL = `
 INSERT INTO rules
-(host, path, method, header, delay, response_status, response)
+(host, site, method, headers, delay, response_status, response_body)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
 `
 
 const GET_RULES_SQL = `
-SELECT host, path, method, header, delay, response_status, response
+SELECT site, path, method, headers, delay, response_status, response_body
 FROM rules
 WHERE host = $1
 ORDER BY path DESC
 `
 
 const INSERT_DOMAIN_SQL = `
-INSERT INTO domains
-(domain)
+INSERT INTO sites
+(site)
 VALUES ($1)
 `
 
 const GET_DOMAIN_SQL = `
 SELECT *
-FROM domains
-WHERE domain = $1
+FROM sites
+WHERE site = $1
 `
 
 type Store struct {
@@ -84,12 +84,12 @@ func WithoutPort(host string) string {
 
 
 func (store *Store) CreateRule(rule *Rule) error {
-  _, err := store.Db.Exec(store.Agnostic(DELETE_RULE_SQL), rule.host, rule.path, rule.method)
+  _, err := store.Db.Exec(store.Agnostic(DELETE_RULE_SQL), rule.site, rule.path, rule.method)
   if err != nil {
     return err
   }
-  _, err = store.Db.Exec(store.Agnostic(INSERT_RULE_SQL), rule.host, rule.path, rule.method,
-    MapToJson(rule.header), rule.delay, rule.responseStatus, rule.response)
+  _, err = store.Db.Exec(store.Agnostic(INSERT_RULE_SQL), rule.site, rule.path, rule.method,
+    MapToJson(rule.headers), rule.delay, rule.responseStatus, rule.responseBody)
   return err
 }
 
@@ -121,10 +121,10 @@ func ReadRule(rows *sql.Rows) (*Rule, error) {
   rule := new(Rule)
   var header string
   var delay int64
-  rows.Scan(&rule.host, &rule.path, &rule.method, &header, &delay, &rule.responseStatus,
-    &rule.response)
+  rows.Scan(&rule.site, &rule.path, &rule.method, &header, &delay, &rule.responseStatus,
+    &rule.responseBody)
   var err error
-  rule.header, err = JsonToMap(header)
+  rule.headers, err = JsonToMap(header)
   if err != nil {
     return nil, err
   }
