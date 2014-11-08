@@ -21,18 +21,18 @@ const MAX_STATUS = 599
 var REDIRECT_STATUS map[int]bool = map[int]bool{301: true, 302: true}
 
 type GoSlowServer struct {
-	Config *Config
-	Store  *Store
-	Hasher *hashids.HashID
+	Config  *Config
+	storage *Storage
+	Hasher  *hashids.HashID
 }
 
 func NewGoSlowServer(config *Config) *GoSlowServer {
-	store, err := NewStore(config.driver, config.dataSource)
+	storage, err := NewStorage(config.driver, config.dataSource)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	server := &GoSlowServer{Config: config, Store: store,
+	server := &GoSlowServer{Config: config, storage: storage,
 		Hasher: NewHasher(config.keySalt, config.minKeyLength)}
 	if config.createDefaultRules {
 		if config.singleDomainUrlPath != "" {
@@ -63,11 +63,11 @@ func (server *GoSlowServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		server.HandleCreateSubdomain(w, r)
 		return
 	case server.IsConfigRequest(r):
-  log.Printf("Got config request, key: <%s>", server.GetKey(r))
+		log.Printf("Got config request, key: <%s>", server.GetKey(r))
 		server.CreateRuleFromRequest(server.GetKey(r), w, r)
 		return
 	}
-	rule, found, err := server.Store.FindRule(server.GetKey(r), r)
+	rule, found, err := server.storage.FindRuleMatching(server.GetKey(r), r)
 	if err != nil {
 		log.Print(err)
 		http.Error(w, "Internal error. For real.", 500)
@@ -110,10 +110,10 @@ func (server *GoSlowServer) GetKey(r *http.Request) string {
 	if server.IsSingleDomain() {
 		return ""
 	}
-  if server.IsConfigRequest(r) {
-	return strings.TrimPrefix(GetSubdomain(r.Host), "admin-")
-}
-return GetSubdomain(r.Host)
+	if server.IsConfigRequest(r) {
+		return strings.TrimPrefix(GetSubdomain(r.Host), "admin-")
+	}
+	return GetSubdomain(r.Host)
 }
 
 // TODO: check crossbrowser compatibility
@@ -153,7 +153,7 @@ func (server *GoSlowServer) CreateRuleFromRequest(subdomain string, w http.Respo
 	delay := 0
 	path := server.GetConfigPath(r)
 	delay, _ = strconv.Atoi(values.Get("delay"))
-	err = server.Store.CreateRule(&Rule{site: subdomain, responseStatus: 200, headers: EmptyHeader(),
+	err = server.storage.CreateRule(&Rule{site: subdomain, responseStatus: 200, headers: EmptyHeader(),
 		path: path, method: values.Get("method"),
 		responseBody: string(payload), delay: time.Duration(delay) * time.Second})
 	log.Print(err)
@@ -161,16 +161,16 @@ func (server *GoSlowServer) CreateRuleFromRequest(subdomain string, w http.Respo
 }
 
 func (server *GoSlowServer) GetConfigPath(r *http.Request) string {
-  if server.IsSingleDomain() {
-    return "/" + strings.TrimPrefix(r.URL.Path, server.Config.singleDomainUrlPath)
-  }
-  return r.URL.Path
+	if server.IsSingleDomain() {
+		return "/" + strings.TrimPrefix(r.URL.Path, server.Config.singleDomainUrlPath)
+	}
+	return r.URL.Path
 }
 
 func (server *GoSlowServer) CreateNewSubdomain(maxAttempts int) (string, error) {
 	for {
 		subdomain := server.GenerateSubdomainName()
-		err := server.Store.CreateSite(subdomain)
+		err := server.storage.CreateSite(subdomain)
 		if err == nil {
 			return subdomain, nil
 		}
@@ -216,7 +216,7 @@ func (server *GoSlowServer) CreateDelayRules() {
 		delayHost := strconv.Itoa(delay)
 		delayInSeconds := time.Duration(delay) * time.Second
 
-		server.Store.CreateRule(&Rule{site: delayHost, headers: EmptyHeader(), delay: delayInSeconds,
+		server.storage.CreateRule(&Rule{site: delayHost, headers: EmptyHeader(), delay: delayInSeconds,
 			responseStatus: 200, responseBody: DEFAULT_RESPONSE,
 		})
 	}
@@ -230,7 +230,7 @@ func (server *GoSlowServer) CreateStatusRules() {
 	for status := MIN_STATUS; status <= MAX_STATUS; status++ {
 		statusHost := strconv.Itoa(status)
 		header := server.HeaderFor(status)
-		server.Store.CreateRule(&Rule{site: statusHost, responseStatus: status,
+		server.storage.CreateRule(&Rule{site: statusHost, responseStatus: status,
 			headers: header, responseBody: DEFAULT_RESPONSE})
 	}
 }

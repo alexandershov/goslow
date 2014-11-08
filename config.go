@@ -9,21 +9,21 @@ import (
 )
 
 type Config struct {
-	address          string
-	driver           string
-	dataSource       string
-	minKeyLength     int
-	keySalt          string
+	address             string
+	driver              string
+	dataSource          string
+	minKeyLength        int
+	keySalt             string
 	createDefaultRules  bool
 	singleDomainUrlPath string
 }
 
 var DEFAULT_CONFIG *Config = &Config{
-	address:          ":5103",
-	driver:           "memory",
-	dataSource:       "",
-	minKeyLength:     6,
-	keySalt:          "",
+	address:             ":5103",
+	driver:              "memory",
+	dataSource:          "",
+	minKeyLength:        6,
+	keySalt:             "",
 	createDefaultRules:  false,
 	singleDomainUrlPath: "/goslow/",
 }
@@ -56,7 +56,6 @@ func defineFlags(config *Config) {
 	flag.StringVar(&config.singleDomainUrlPath, "single-domain-url-path", DEFAULT_CONFIG.singleDomainUrlPath,
 		"Run in single domain mode, use localhost/goslow for configuration")
 }
-
 
 // TODO: options in JSON config should be named the same as cmd options
 // i.e min-key-length, not minKeyLength
