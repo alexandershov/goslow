@@ -15,11 +15,11 @@ type Rule struct {
 	responseBody      string
 }
 
-func (rule *Rule) Match(r *http.Request) bool {
-	return Match(rule.path, r.URL.Path) && Match(rule.method, r.Method)
+func (rule *Rule) Matches(req *http.Request) bool {
+	return Matches(rule.path, req.URL.Path) && Matches(rule.method, req.Method)
 }
 
-func Match(pattern, name string) bool {
+func Matches(pattern, name string) bool {
 	// empty pattern matches anything
 	if pattern == "" {
 		return true

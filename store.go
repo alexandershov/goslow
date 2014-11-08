@@ -70,7 +70,7 @@ func (store *Store) FindRule(key string, r *http.Request) (rule *Rule, found boo
 		return nil, false, err
 	}
 	for _, rule := range rules {
-		if rule.Match(r) {
+		if rule.Matches(r) {
 			return rule, true, nil
 		}
 	}
