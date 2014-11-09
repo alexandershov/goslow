@@ -18,7 +18,7 @@ type Config struct {
 var DEFAULT_CONFIG *Config = &Config{
 	address:             ":5103",
 	driver:              "sqlite3",
-	dataSource:          "sqlite::memory:",
+	dataSource:          ":memory:",
 	minSiteLength:       6,
 	siteSalt:            "",
 	createDefaultRules:  false,

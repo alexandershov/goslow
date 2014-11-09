@@ -35,7 +35,7 @@ WHERE site = $1 AND path = $2 AND method = $3
 
 const CREATE_RULE_SQL = `
 INSERT INTO rules
-(site, method, headers, delay, response_status, response_body)
+(site, path, method, headers, delay, response_status, response_body)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
 `
 
