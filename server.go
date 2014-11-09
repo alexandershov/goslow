@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+  "regexp"
+  "text/template"
 	"strings"
 	"time"
   "errors"
@@ -23,8 +25,21 @@ const CREATE_SUBDOMAIN_NAME = "create"
 const CHANGE_SITE_PREFIX = "admin-"
 const BUG_REPORTS_EMAIL = "codumentary.com@gmail.com"
 
-var REDIRECT_STATUSES map[int]bool = map[int]bool{301: true, 302: true}
-var EMPTY_HEADERS map[string]string = make(map[string]string)
+
+var REDIRECT_STATUSES = map[int]bool{301: true, 302: true}
+var EMPTY_HEADERS = map[string]string{}
+
+var CREATE_SITE_TEMPLATE = template.Must(template.New("create site").Parse(
+`Site {{ .site }} was created successfully.
+
+Use admin-{{ .site }} subdomain for configuration.
+`))
+
+var ADD_RULE_TEMPLATE = template.Must(template.New("add rule").Parse(
+`Path {{ .path }} now responds with {{ .responseBody }}.
+
+Use admin-{{ .site }} subdomain for configuration.
+`))
 
 const MAX_GENERATE_SITE_NAME_ATTEMPTS = 5
 const DURATION_BETWEEN_GENERATE_SITE_NAME_ATTEMPTS = time.Duration(10) * time.Millisecond
@@ -33,6 +48,7 @@ type Server struct {
 	config  *Config
 	storage *Storage
 	hasher  *hashids.HashID
+  pathRegexp *regexp.Regexp
 }
 
 func NewServer(config *Config) *Server {
@@ -42,7 +58,9 @@ func NewServer(config *Config) *Server {
 	}
 
 	server := &Server{config: config, storage: storage,
-		hasher: newHasher(config.siteSalt, config.minSiteLength)}
+		hasher: newHasher(config.siteSalt, config.minSiteLength),
+    pathRegexp: regexp.MustCompile(fmt.Sprintf("%s\\b.*", config.singleDomainUrlPath)),
+    }
 	if config.createDefaultRules {
 		server.createDefaultRules()
 	}
@@ -62,10 +80,13 @@ func (server *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	switch {
 	case server.isOptions(req):
 		allowCrossDomainRequests(w, req)
+
 	case server.isCreateSite(req):
-		server.createSite(req)
-	case server.isChangeSite(req):
-		server.changeSite(server.getSite(req), req)
+		server.handleCreateSite(w, req)
+
+	case server.isAddRule(req):
+		server.handleAddRule(w, req)
+
 	default:
 		allowCrossDomainRequests(w, req)
 		server.respondFromRule(w, req)
@@ -103,12 +124,24 @@ func getSubdomain(url string) string {
 	return strings.Split(url, ".")[0]
 }
 
-func (server *Server) createSite(req *http.Request) error {
+func (server *Server) handleCreateSite(w http.ResponseWriter, req *http.Request) {
+  rule, err := server.createSite(req)
+  if err != nil {
+    server.handleError(err, w)
+    return
+  }
+  CREATE_SITE_TEMPLATE.Execute(w, rule)
+  io.WriteString(w, "\n")
+  ADD_RULE_TEMPLATE.Execute(w, rule)
+}
+
+func (server *Server) createSite(req *http.Request) (*Rule, error) {
 	site, err := server.generateUniqueSiteName(MAX_GENERATE_SITE_NAME_ATTEMPTS)
 	if err != nil {
-		return err
+		return nil, err
 	}
-  return server.changeSite(site, req)
+  rule, err := server.addRule(site, req)
+  return rule, err
 }
 
 func (server *Server) generateUniqueSiteName(maxAttempts uint) (string, error) {
@@ -140,12 +173,12 @@ func generateUniqueNumbers() []int {
   return []int{seconds, milliseconds}
 }
 
-func (server *Server) changeSite(site string, req *http.Request) error {
+func (server *Server) addRule(site string, req *http.Request) (*Rule, error) {
   rule, err := server.makeRule(site, req)
   if err != nil {
-    return err
+    return nil, err
   }
-  return server.storage.UpsertRule(rule)
+  return rule, server.storage.UpsertRule(rule)
 }
 
 func (server *Server) makeRule(site string, req *http.Request) (*Rule, error) {
@@ -168,6 +201,10 @@ func (server *Server) makeRule(site string, req *http.Request) (*Rule, error) {
     responseBody: string(body), delay: time.Duration(delay) * time.Second}, nil
 }
 
+func (server *Server) handleError(err error, w http.ResponseWriter) {
+  http.Error(w, err.Error(), http.StatusInternalServerError)
+}
+
 func (server *Server) respondFromRule(w http.ResponseWriter, req *http.Request) {
 	rule, found, err := server.storage.FindRuleMatching(server.getSite(req), req)
 	if err != nil {
@@ -183,15 +220,23 @@ func (server *Server) respondFromRule(w http.ResponseWriter, req *http.Request) 
 	}
 }
 
-func (server *Server) isChangeSite(r *http.Request) bool {
+func (server *Server) isAddRule(r *http.Request) bool {
 	if r.Method != "POST" {
 		return false
 	}
 	if server.isInSingleSiteMode() {
-		return strings.HasPrefix(r.URL.Path, server.config.singleDomainUrlPath)
-
+		return server.pathRegexp.MatchString(r.URL.Path)
 	}
 	return strings.HasPrefix(getSubdomain(r.Host), CHANGE_SITE_PREFIX)
+}
+
+func (server *Server) handleAddRule(w http.ResponseWriter, req *http.Request) {
+  rule, err := server.addRule(server.getSite(req), req)
+  if err != nil {
+    server.handleError(err, w)
+    return
+  }
+  ADD_RULE_TEMPLATE.Execute(w, rule)
 }
 
 func (server *Server) getSite(req *http.Request) string {
@@ -199,13 +244,11 @@ func (server *Server) getSite(req *http.Request) string {
 		return ""
 	}
   subdomain := getSubdomain(req.Host)
-	if server.isChangeSite(req) {
+	if server.isAddRule(req) {
 		return strings.TrimPrefix(subdomain, CHANGE_SITE_PREFIX)
 	}
 	return subdomain
 }
-
-
 
 func (server *Server) getPath(req *http.Request) string {
 	if server.isInSingleSiteMode() {
