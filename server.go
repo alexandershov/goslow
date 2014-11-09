@@ -19,6 +19,7 @@ const MIN_STATUS = 100
 const MAX_STATUS = 599
 
 var REDIRECT_STATUS map[int]bool = map[int]bool{301: true, 302: true}
+var EMPTY_HEADERS map[string]string = make(map[string]string)
 
 const MAX_GENERATE_SITE_NAME_ATTEMPTS = 5
 const DURATION_BETWEEN_GENERATE_SITE_NAME_ATTEMPTS = time.Duration(10) * time.Millisecond
@@ -38,7 +39,7 @@ func NewServer(config *Config) *Server {
 	server := &Server{config: config, storage: storage,
 		hasher: NewHasher(config.siteSalt, config.minSiteLength)}
 	if config.createDefaultRules {
-		server.CreateDefaultRules()
+		server.createDefaultRules()
 	}
 	return server
 }
@@ -54,6 +55,7 @@ func NewHasher(salt string, minLength int) *hashids.HashID {
 func (server *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	log.Printf("%s %s", req.Method, req.URL.Path)
 	allowCrossDomainRequests(w, req)
+
 	switch {
 	case server.isOptionsRequest(req):
 		// do nothing
@@ -157,7 +159,7 @@ func (server *Server) createRuleFromRequest(subdomain string, w http.ResponseWri
 	delay := 0
 	path := server.GetConfigPath(r)
 	delay, _ = strconv.Atoi(values.Get("delay"))
-	err = server.storage.UpsertRule(&Rule{site: subdomain, responseStatus: 200, headers: EmptyHeader(),
+	err = server.storage.UpsertRule(&Rule{site: subdomain, responseStatus: http.StatusOK, headers: EMPTY_HEADERS,
 		path: path, method: values.Get("method"),
 		responseBody: string(payload), delay: time.Duration(delay) * time.Second})
 	log.Print(err)
@@ -209,36 +211,32 @@ func AddHeaders(header map[string]string, w http.ResponseWriter) {
 	}
 }
 
-func (server *Server) CreateDefaultRules() {
-	server.CreateDelayRules()
-	server.CreateStatusRules()
+func (server *Server) createDefaultRules() {
+	server.createDelayRules()
+	server.createStatusRules()
 }
 
-func (server *Server) CreateDelayRules() {
-	for delay := 0; delay <= MAX_DELAY; delay++ {
-		delayHost := strconv.Itoa(delay)
-		delayInSeconds := time.Duration(delay) * time.Second
+func (server *Server) createDelayRules() {
+	for i := 0; i <= MAX_DELAY; i++ {
+		delaySite := strconv.Itoa(i)
+		delay := time.Duration(i) * time.Second
 
-		server.storage.UpsertRule(&Rule{site: delayHost, headers: EmptyHeader(), delay: delayInSeconds,
-			responseStatus: 200, responseBody: DEFAULT_RESPONSE,
+		server.storage.UpsertRule(&Rule{site: delaySite, headers: EMPTY_HEADERS, delay: delay,
+			responseStatus: http.StatusOK, responseBody: DEFAULT_RESPONSE,
 		})
 	}
 }
 
-func EmptyHeader() map[string]string {
-	return make(map[string]string)
-}
-
-func (server *Server) CreateStatusRules() {
+func (server *Server) createStatusRules() {
 	for status := MIN_STATUS; status <= MAX_STATUS; status++ {
 		statusHost := strconv.Itoa(status)
-		header := server.HeaderFor(status)
+		header := server.headerFor(status)
 		server.storage.UpsertRule(&Rule{site: statusHost, responseStatus: status,
 			headers: header, responseBody: DEFAULT_RESPONSE})
 	}
 }
 
-func (server *Server) HeaderFor(status int) map[string]string {
+func (server *Server) headerFor(status int) map[string]string {
 	_, isRedirect := REDIRECT_STATUS[status]
 	if isRedirect {
 		// TODO: check that protocol-independent location is legal HTTP
@@ -246,7 +244,7 @@ func (server *Server) HeaderFor(status int) map[string]string {
 		host := fmt.Sprintf("//0.goslow.link")
 		return map[string]string{"Location": host}
 	}
-	return EmptyHeader()
+	return EMPTY_HEADERS
 }
 
 func (server *Server) ListenAndServe() error {
