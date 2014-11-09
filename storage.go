@@ -116,11 +116,11 @@ func makeRule(rows *sql.Rows) (*Rule, error) {
 	rule := new(Rule)
 	var headersJson string
 	var delay int64
-	rows.Scan(&rule.site, &rule.path, &rule.method, &headersJson, &delay, &rule.responseStatus,
-		&rule.responseBody)
-	rule.delay = time.Duration(delay)
+	rows.Scan(&rule.Site, &rule.Path, &rule.Method, &headersJson, &delay, &rule.ResponseStatus,
+		&rule.ResponseBody)
+	rule.Delay = time.Duration(delay)
 	var err error
-	rule.headers, err = jsonToMap(headersJson)
+	rule.Headers, err = jsonToMap(headersJson)
 	return rule, err
 }
 
@@ -151,13 +151,16 @@ func (storage *Storage) UpsertRule(rule *Rule) error {
 	if err != nil {
 		return err
 	}
-	defer tx.Commit()
-	_, err = tx.Exec(storage.dialectify(DELETE_RULE_SQL), rule.site, rule.path, rule.method)
+	defer tx.Rollback()
+	_, err = tx.Exec(storage.dialectify(DELETE_RULE_SQL), rule.Site, rule.Path, rule.Method)
 	if err != nil {
 		return err
 	}
-	_, err = tx.Exec(storage.dialectify(CREATE_RULE_SQL), rule.site, rule.path, rule.method,
-		stringMapToJson(rule.headers), rule.delay, rule.responseStatus, rule.responseBody)
+	_, err = tx.Exec(storage.dialectify(CREATE_RULE_SQL), rule.Site, rule.Path, rule.Method,
+		stringMapToJson(rule.Headers), rule.Delay, rule.ResponseStatus, rule.ResponseBody)
+  if err != nil {
+    return err
+  }
 	return tx.Commit()
 }
 

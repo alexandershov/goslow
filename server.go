@@ -30,15 +30,13 @@ var REDIRECT_STATUSES = map[int]bool{301: true, 302: true}
 var EMPTY_HEADERS = map[string]string{}
 
 var CREATE_SITE_TEMPLATE = template.Must(template.New("create site").Parse(
-`Site {{ .site }} was created successfully.
+`Site {{.Site }} was created successfully.
 
-Use admin-{{ .site }} subdomain for configuration.
+Use admin-{{.Site }} subdomain for configuration.
 `))
 
 var ADD_RULE_TEMPLATE = template.Must(template.New("add rule").Parse(
-`Path {{ .path }} now responds with {{ .responseBody }}.
-
-Use admin-{{ .site }} subdomain for configuration.
+`Path {{.Path }} now responds with {{ .ResponseBody }}.
 `))
 
 const MAX_GENERATE_SITE_NAME_ATTEMPTS = 5
@@ -194,9 +192,9 @@ func (server *Server) makeRule(site string, req *http.Request) (*Rule, error) {
   if err != nil {
     return nil, err
   }
-  return &Rule{site: site, responseStatus: http.StatusOK, headers: EMPTY_HEADERS,
-    path: path, method: values.Get("method"),
-    responseBody: string(body), delay: delay}, nil
+  return &Rule{Site: site, ResponseStatus: http.StatusOK, Headers: EMPTY_HEADERS,
+    Path: path, Method: values.Get("method"),
+    ResponseBody: string(body), Delay: delay}, nil
 }
 
 func getDelay(values url.Values) (time.Duration, error) {
@@ -272,12 +270,12 @@ func ensureHasPrefix(s, prefix string) string {
 }
 
 func ApplyRule(rule *Rule, w http.ResponseWriter) {
-	log.Printf("sleeping for %v", rule.delay)
-	time.Sleep(rule.delay)
+	log.Printf("sleeping for %v", rule.Delay)
+	time.Sleep(rule.Delay)
 
-	addHeaders(rule.headers, w)
-	w.WriteHeader(rule.responseStatus)
-	io.WriteString(w, rule.responseBody)
+	addHeaders(rule.Headers, w)
+	w.WriteHeader(rule.ResponseStatus)
+	io.WriteString(w, rule.ResponseBody)
 }
 
 func addHeaders(headers map[string]string, w http.ResponseWriter) {
@@ -297,8 +295,8 @@ func (server *Server) createDelayRules() {
 		delaySite := strconv.Itoa(i)
 		delay := time.Duration(i) * time.Second
 
-		server.storage.UpsertRule(&Rule{site: delaySite, headers: EMPTY_HEADERS, delay: delay,
-			responseStatus: http.StatusOK, responseBody: DEFAULT_RESPONSE,
+		server.storage.UpsertRule(&Rule{Site: delaySite, Headers: EMPTY_HEADERS, Delay: delay,
+			ResponseStatus: http.StatusOK, ResponseBody: DEFAULT_RESPONSE,
 		})
 	}
 }
@@ -307,8 +305,8 @@ func (server *Server) createStatusRules() {
 	for i := MIN_STATUS; i <= MAX_STATUS; i++ {
 		statusSite := strconv.Itoa(i)
 		headers := server.headersForStatus(i)
-		server.storage.UpsertRule(&Rule{site: statusSite, responseStatus: i,
-			headers: headers, responseBody: DEFAULT_RESPONSE})
+		server.storage.UpsertRule(&Rule{Site: statusSite, ResponseStatus: i,
+			Headers: headers, ResponseBody: DEFAULT_RESPONSE})
 	}
 }
 
