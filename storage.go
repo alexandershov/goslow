@@ -14,6 +14,20 @@ import (
 
 var POSTGRES_PLACEHOLDERS *regexp.Regexp = regexp.MustCompile("\\$\\d+")
 
+const CREATE_SCHEMA_SQL = `
+CREATE TABLE IF NOT EXISTS sites(
+  site TEXT PRIMARY KEY
+);
+
+CREATE TABLE IF NOT EXISTS rules (
+  site TEXT, path TEXT, method TEXT, headers TEXT,
+  delay BIGINT, response_status INT, response_body TEXT,
+  PRIMARY KEY(site, path, method),
+  FOREIGN KEY(site) REFERENCES sites(site)
+);
+
+`
+
 const DELETE_RULE_SQL = `
 DELETE FROM rules
 WHERE site = $1 AND path = $2 AND method = $3
@@ -55,11 +69,9 @@ func NewStorage(driver string, dataSource string) (*Storage, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = db.Ping()
-	if err != nil {
-		return nil, err
-	}
-	return &Storage{driver: driver, dataSource: dataSource, db: db}, nil
+  storage := &Storage{driver: driver, dataSource: dataSource, db: db}
+	_, err = storage.db.Exec(storage.dialectify(CREATE_SCHEMA_SQL))
+  return storage, err
 }
 
 func (storage *Storage) FindRuleMatching(site string, req *http.Request) (rule *Rule, found bool, err error) {
