@@ -22,7 +22,7 @@ var DEFAULT_CONFIG *Config = &Config{
 	minSiteLength:       6,
 	siteSalt:            "",
 	createDefaultRules:  false,
-	singleDomainUrlPath: "/goslow/",
+	singleDomainUrlPath: "/goslow",
 }
 
 func NewConfigFromArgs() *Config {

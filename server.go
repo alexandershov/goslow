@@ -20,6 +20,7 @@ const MIN_STATUS = 100
 const MAX_STATUS = 599
 
 const CREATE_SUBDOMAIN_NAME = "create"
+const CHANGE_SITE_PREFIX = "admin-"
 const BUG_REPORTS_EMAIL = "codumentary.com@gmail.com"
 
 var REDIRECT_STATUSES map[int]bool = map[int]bool{301: true, 302: true}
@@ -62,9 +63,9 @@ func (server *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	case server.isOptions(req):
 		allowCrossDomainRequests(w, req)
 	case server.isCreateSite(req):
-		server.createSite(w, req)
+		server.createSite(req)
 	case server.isChangeSite(req):
-		server.changeSite(server.GetKey(req), req)
+		server.changeSite(server.getSite(req), req)
 	default:
 		allowCrossDomainRequests(w, req)
 		server.respondFromRule(w, req)
@@ -102,16 +103,15 @@ func getSubdomain(url string) string {
 	return strings.Split(url, ".")[0]
 }
 
-func (server *Server) createSite(w http.ResponseWriter, req *http.Request) {
-	site, err := server.generateSiteName(MAX_GENERATE_SITE_NAME_ATTEMPTS)
+func (server *Server) createSite(req *http.Request) error {
+	site, err := server.generateUniqueSiteName(MAX_GENERATE_SITE_NAME_ATTEMPTS)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return err
 	}
-	server.changeSite(site, req)
+  return server.changeSite(site, req)
 }
 
-func (server *Server) generateSiteName(maxAttempts uint) (string, error) {
+func (server *Server) generateUniqueSiteName(maxAttempts uint) (string, error) {
   for ; maxAttempts > 0; maxAttempts-- {
     site, err := server.makeSiteNameFrom(generateUniqueNumbers())
     if err != nil {
@@ -135,9 +135,9 @@ func (server *Server) makeSiteNameFrom(numbers []int) (string, error) {
 
 func generateUniqueNumbers() []int {
   utc := time.Now().UTC()
-  second := int(utc.Unix()) // TODO: fix me at 2037-12-31
-  millisecond := utc.Nanosecond() / 1000000
-  return []int{second, millisecond}
+  seconds := int(utc.Unix()) // TODO: fix me at 2037-12-31
+  milliseconds := (utc.Nanosecond() / 1000000) % 1000
+  return []int{seconds, milliseconds}
 }
 
 func (server *Server) changeSite(site string, req *http.Request) error {
@@ -158,26 +158,28 @@ func (server *Server) makeRule(site string, req *http.Request) (*Rule, error) {
   if err != nil {
     return nil, err
   }
-  delay := 0
-  path := server.GetConfigPath(req)
-  delay, _ = strconv.Atoi(values.Get("delay"))
+  path := server.getPath(req)
+  delay, err := strconv.ParseFloat(values.Get("delay"), 64)
+  if err != nil {
+      return nil, err
+  }
   return &Rule{site: site, responseStatus: http.StatusOK, headers: EMPTY_HEADERS,
     path: path, method: values.Get("method"),
     responseBody: string(body), delay: time.Duration(delay) * time.Second}, nil
 }
 
 func (server *Server) respondFromRule(w http.ResponseWriter, req *http.Request) {
-	rule, found, err := server.storage.FindRuleMatching(server.GetKey(req), req)
+	rule, found, err := server.storage.FindRuleMatching(server.getSite(req), req)
 	if err != nil {
 		log.Print(err)
-		http.Error(w, "Internal error. For real.", 500)
+		http.Error(w, "Internal error. For real.", http.StatusInternalServerError)
 		return
 	}
 
 	if found {
 		ApplyRule(rule, w)
 	} else {
-		http.Error(w, "No rule. For real.", 404)
+		http.Error(w, "No rule. For real.", http.StatusNotFound)
 	}
 }
 
@@ -189,26 +191,35 @@ func (server *Server) isChangeSite(r *http.Request) bool {
 		return strings.HasPrefix(r.URL.Path, server.config.singleDomainUrlPath)
 
 	}
-	return strings.HasPrefix(getSubdomain(r.Host), "admin-")
+	return strings.HasPrefix(getSubdomain(r.Host), CHANGE_SITE_PREFIX)
 }
 
-func (server *Server) GetKey(req *http.Request) string {
+func (server *Server) getSite(req *http.Request) string {
 	if server.isInSingleSiteMode() {
 		return ""
 	}
+  subdomain := getSubdomain(req.Host)
 	if server.isChangeSite(req) {
-		return strings.TrimPrefix(getSubdomain(req.Host), "admin-")
+		return strings.TrimPrefix(subdomain, CHANGE_SITE_PREFIX)
 	}
-	return getSubdomain(req.Host)
+	return subdomain
 }
 
 
 
-func (server *Server) GetConfigPath(r *http.Request) string {
+func (server *Server) getPath(req *http.Request) string {
 	if server.isInSingleSiteMode() {
-		return "/" + strings.TrimPrefix(r.URL.Path, server.config.singleDomainUrlPath)
+		path := strings.TrimPrefix(req.URL.Path, server.config.singleDomainUrlPath)
+    return ensureHasPrefix(path, "/")
 	}
-	return r.URL.Path
+	return req.URL.Path
+}
+
+func ensureHasPrefix(s, prefix string) string {
+  if !strings.HasPrefix(s, prefix) {
+    return prefix + s
+  }
+  return s
 }
 
 
