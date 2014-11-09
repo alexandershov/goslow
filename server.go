@@ -11,12 +11,16 @@ import (
 	"strconv"
 	"strings"
 	"time"
+  "errors"
 )
 
 const DEFAULT_RESPONSE = `{"default": "response"}`
 const MAX_DELAY = 99
 const MIN_STATUS = 100
 const MAX_STATUS = 599
+
+const CREATE_SUBDOMAIN_NAME = "create"
+const BUG_REPORTS_EMAIL = "codumentary.com@gmail.com"
 
 var REDIRECT_STATUSES map[int]bool = map[int]bool{301: true, 302: true}
 var EMPTY_HEADERS map[string]string = make(map[string]string)
@@ -56,43 +60,110 @@ func (server *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	log.Printf("%s %s", req.Method, req.URL.Path)
 	switch {
 	case server.isOptions(req):
-   allowCrossDomainRequests(w, req)
+		allowCrossDomainRequests(w, req)
 	case server.isCreateSite(req):
 		server.createSite(w, req)
 	case server.isChangeSite(req):
-		server.createRuleFromRequest(server.GetKey(req), w, req)
+		server.changeSite(server.GetKey(req), req)
 	default:
-    allowCrossDomainRequests(w, req)
+		allowCrossDomainRequests(w, req)
 		server.respondFromRule(w, req)
 	}
 }
 
 func (server *Server) isOptions(req *http.Request) bool {
-  return req.Method == "OPTIONS"
+	return req.Method == "OPTIONS"
 }
 
 // TODO: check crossbrowser compatibility
 func allowCrossDomainRequests(w http.ResponseWriter, req *http.Request) {
-  header := w.Header()
-  header.Set("Access-Control-Allow-Origin", "*")
-  header.Set("Access-Control-Allow-Credentials", "true")
-  header["Access-Control-Allow-Headers"] = req.Header["Access-Control-Request-Headers"]
+	header := w.Header()
+	header.Set("Access-Control-Allow-Origin", "*")
+	header.Set("Access-Control-Allow-Credentials", "true")
+	header["Access-Control-Allow-Headers"] = req.Header["Access-Control-Request-Headers"]
 }
 
 func (server *Server) isCreateSite(req *http.Request) bool {
-  if req.Method != "POST" {
-    return false
-  }
+	if req.Method != "POST" {
+		return false
+	}
 
-  if server.isInSingleSiteMode() {
-    return false
-  }
-  return GetSubdomain(req.Host) == "create"
+	if server.isInSingleSiteMode() {
+		return false
+	}
+	return getSubdomain(req.Host) == CREATE_SUBDOMAIN_NAME
 }
 
-
 func (server *Server) isInSingleSiteMode() bool {
-  return server.config.singleDomainUrlPath != ""
+	return server.config.singleDomainUrlPath != ""
+}
+
+func getSubdomain(url string) string {
+	return strings.Split(url, ".")[0]
+}
+
+func (server *Server) createSite(w http.ResponseWriter, req *http.Request) {
+	site, err := server.generateSiteName(MAX_GENERATE_SITE_NAME_ATTEMPTS)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	server.changeSite(site, req)
+}
+
+func (server *Server) generateSiteName(maxAttempts uint) (string, error) {
+  for ; maxAttempts > 0; maxAttempts-- {
+    site, err := server.makeSiteNameFrom(generateUniqueNumbers())
+    if err != nil {
+      log.Print(err)
+      break
+    }
+    err = server.storage.CreateSite(site)
+    if err == nil {
+      return site, nil
+    }
+    log.Print(err)
+    time.Sleep(DURATION_BETWEEN_GENERATE_SITE_NAME_ATTEMPTS)
+  }
+  return "", errors.New(fmt.Sprintf(`Can't create site.
+Try again in a few seconds or contact %s for help`, BUG_REPORTS_EMAIL))
+}
+
+func (server *Server) makeSiteNameFrom(numbers []int) (string, error) {
+  return server.hasher.Encode(numbers)
+}
+
+func generateUniqueNumbers() []int {
+  utc := time.Now().UTC()
+  second := int(utc.Unix()) // TODO: fix me at 2037-12-31
+  millisecond := utc.Nanosecond() / 1000000
+  return []int{second, millisecond}
+}
+
+func (server *Server) changeSite(site string, req *http.Request) error {
+  rule, err := server.makeRule(site, req)
+  if err != nil {
+    return err
+  }
+  return server.storage.UpsertRule(rule)
+}
+
+func (server *Server) makeRule(site string, req *http.Request) (*Rule, error) {
+  body, err := ioutil.ReadAll(req.Body)
+  if err != nil {
+    return nil, err
+  }
+
+  values, err := url.ParseQuery(req.URL.RawQuery)
+  if err != nil {
+    return nil, err
+  }
+  delay := 0
+  path := server.GetConfigPath(req)
+  delay, _ = strconv.Atoi(values.Get("delay"))
+  return &Rule{site: site, responseStatus: http.StatusOK, headers: EMPTY_HEADERS,
+    path: path, method: values.Get("method"),
+    responseBody: string(body), delay: time.Duration(delay) * time.Second}, nil
 }
 
 func (server *Server) respondFromRule(w http.ResponseWriter, req *http.Request) {
@@ -110,10 +181,6 @@ func (server *Server) respondFromRule(w http.ResponseWriter, req *http.Request) 
 	}
 }
 
-
-
-
-
 func (server *Server) isChangeSite(r *http.Request) bool {
 	if r.Method != "POST" {
 		return false
@@ -122,56 +189,20 @@ func (server *Server) isChangeSite(r *http.Request) bool {
 		return strings.HasPrefix(r.URL.Path, server.config.singleDomainUrlPath)
 
 	}
-	return strings.HasPrefix(GetSubdomain(r.Host), "admin-")
+	return strings.HasPrefix(getSubdomain(r.Host), "admin-")
 }
-
 
 func (server *Server) GetKey(req *http.Request) string {
 	if server.isInSingleSiteMode() {
 		return ""
 	}
 	if server.isChangeSite(req) {
-		return strings.TrimPrefix(GetSubdomain(req.Host), "admin-")
+		return strings.TrimPrefix(getSubdomain(req.Host), "admin-")
 	}
-	return GetSubdomain(req.Host)
+	return getSubdomain(req.Host)
 }
 
 
-
-func GetSubdomain(url string) string {
-	return strings.Split(url, ".")[0]
-}
-
-func (server *Server) createSite(w http.ResponseWriter, req *http.Request) {
-	site, err := server.generateSiteName(MAX_GENERATE_SITE_NAME_ATTEMPTS)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	server.createRuleFromRequest(site, w, req)
-}
-
-func (server *Server) createRuleFromRequest(subdomain string, w http.ResponseWriter, r *http.Request) {
-	payload, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		io.WriteString(w, fmt.Sprintf("ERROR: %s", err))
-		return
-	}
-
-	values, err := url.ParseQuery(r.URL.RawQuery)
-	if err != nil {
-		io.WriteString(w, fmt.Sprintf("ERROR: %s", err))
-		return
-	}
-	delay := 0
-	path := server.GetConfigPath(r)
-	delay, _ = strconv.Atoi(values.Get("delay"))
-	err = server.storage.UpsertRule(&Rule{site: subdomain, responseStatus: http.StatusOK, headers: EMPTY_HEADERS,
-		path: path, method: values.Get("method"),
-		responseBody: string(payload), delay: time.Duration(delay) * time.Second})
-	log.Print(err)
-	io.WriteString(w, fmt.Sprintf("Created domain %s\n", subdomain))
-}
 
 func (server *Server) GetConfigPath(r *http.Request) string {
 	if server.isInSingleSiteMode() {
@@ -180,27 +211,7 @@ func (server *Server) GetConfigPath(r *http.Request) string {
 	return r.URL.Path
 }
 
-func (server *Server) generateSiteName(maxAttempts uint) (string, error) {
-	var err error
-	for ; maxAttempts > 0; maxAttempts-- {
-		site, err := server.generateSiteNameFrom(time.Now().UTC().UnixNano())
-		if err != nil {
-			break
-		}
-		err = server.storage.CreateSite(site)
-		if err == nil {
-			return site, nil
-		}
-		time.Sleep(DURATION_BETWEEN_GENERATE_SITE_NAME_ATTEMPTS)
-	}
-	return "", err
-}
 
-func (server *Server) generateSiteNameFrom(nanoseconds int64) (string, error) {
-	totalSeconds := int(nanoseconds / 1000000000)
-	millisecondsPart := int((nanoseconds / 1000000) % 1000)
-	return server.hasher.Encode([]int{totalSeconds, millisecondsPart})
-}
 
 func ApplyRule(rule *Rule, w http.ResponseWriter) {
 	log.Printf("sleeping for %v", rule.delay)
