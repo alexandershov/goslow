@@ -20,20 +20,20 @@ const MAX_STATUS = 599
 
 var REDIRECT_STATUS map[int]bool = map[int]bool{301: true, 302: true}
 
-type GoSlowServer struct {
-	Config  *Config
+type Server struct {
+	config  *Config
 	storage *Storage
-	Hasher  *hashids.HashID
+	hasher  *hashids.HashID
 }
 
-func NewGoSlowServer(config *Config) *GoSlowServer {
+func NewServer(config *Config) *Server {
 	storage, err := NewStorage(config.driver, config.dataSource)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	server := &GoSlowServer{Config: config, storage: storage,
-		Hasher: NewHasher(config.keySalt, config.minKeyLength)}
+	server := &Server{config: config, storage: storage,
+		hasher: NewHasher(config.keySalt, config.minKeyLength)}
 	if config.createDefaultRules {
 		if config.singleDomainUrlPath != "" {
 			log.Fatal("You can't use both --single-domain-path and --create-default-rules options")
@@ -53,7 +53,7 @@ func NewHasher(salt string, minKeyLength int) *hashids.HashID {
 	return hashids.NewWithData(hd)
 }
 
-func (server *GoSlowServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (server *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	log.Printf("%s %s", r.Method, r.URL.Path)
 	AllowCrossDomainRequests(w, r)
 	switch {
@@ -80,7 +80,7 @@ func (server *GoSlowServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (server *GoSlowServer) IsCreateRequest(r *http.Request) bool {
+func (server *Server) IsCreateRequest(r *http.Request) bool {
 	if r.Method != "POST" {
 		return false
 	}
@@ -91,22 +91,22 @@ func (server *GoSlowServer) IsCreateRequest(r *http.Request) bool {
 	return GetSubdomain(r.Host) == "create"
 }
 
-func (server *GoSlowServer) IsConfigRequest(r *http.Request) bool {
+func (server *Server) IsConfigRequest(r *http.Request) bool {
 	if r.Method != "POST" {
 		return false
 	}
 	if server.IsSingleDomain() {
-		return strings.HasPrefix(r.URL.Path, server.Config.singleDomainUrlPath)
+		return strings.HasPrefix(r.URL.Path, server.config.singleDomainUrlPath)
 
 	}
 	return strings.HasPrefix(GetSubdomain(r.Host), "admin-")
 }
 
-func (server *GoSlowServer) IsSingleDomain() bool {
-	return server.Config.singleDomainUrlPath != ""
+func (server *Server) IsSingleDomain() bool {
+	return server.config.singleDomainUrlPath != ""
 }
 
-func (server *GoSlowServer) GetKey(r *http.Request) string {
+func (server *Server) GetKey(r *http.Request) string {
 	if server.IsSingleDomain() {
 		return ""
 	}
@@ -128,7 +128,7 @@ func GetSubdomain(url string) string {
 	return strings.Split(url, ".")[0]
 }
 
-func (server *GoSlowServer) HandleCreateSubdomain(w http.ResponseWriter, r *http.Request) {
+func (server *Server) HandleCreateSubdomain(w http.ResponseWriter, r *http.Request) {
 	subdomain, err := server.CreateNewSubdomain(5)
 
 	if err == nil {
@@ -138,7 +138,7 @@ func (server *GoSlowServer) HandleCreateSubdomain(w http.ResponseWriter, r *http
 	}
 }
 
-func (server *GoSlowServer) CreateRuleFromRequest(subdomain string, w http.ResponseWriter, r *http.Request) {
+func (server *Server) CreateRuleFromRequest(subdomain string, w http.ResponseWriter, r *http.Request) {
 	payload, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		io.WriteString(w, fmt.Sprintf("ERROR: %s", err))
@@ -160,14 +160,14 @@ func (server *GoSlowServer) CreateRuleFromRequest(subdomain string, w http.Respo
 	io.WriteString(w, fmt.Sprintf("Created domain %s\n", subdomain))
 }
 
-func (server *GoSlowServer) GetConfigPath(r *http.Request) string {
+func (server *Server) GetConfigPath(r *http.Request) string {
 	if server.IsSingleDomain() {
-		return "/" + strings.TrimPrefix(r.URL.Path, server.Config.singleDomainUrlPath)
+		return "/" + strings.TrimPrefix(r.URL.Path, server.config.singleDomainUrlPath)
 	}
 	return r.URL.Path
 }
 
-func (server *GoSlowServer) CreateNewSubdomain(maxAttempts int) (string, error) {
+func (server *Server) CreateNewSubdomain(maxAttempts int) (string, error) {
 	for {
 		subdomain := server.GenerateSubdomainName()
 		err := server.storage.CreateSite(subdomain)
@@ -182,11 +182,11 @@ func (server *GoSlowServer) CreateNewSubdomain(maxAttempts int) (string, error) 
 	}
 }
 
-func (server *GoSlowServer) GenerateSubdomainName() string {
+func (server *Server) GenerateSubdomainName() string {
 	nanoseconds := time.Now().UTC().UnixNano()
 	totalSeconds := int(nanoseconds / 1000000000)
 	millisecondsPart := int((nanoseconds / 1000000) % 1000)
-	hash, _ := server.Hasher.Encode([]int{totalSeconds, millisecondsPart})
+	hash, _ := server.hasher.Encode([]int{totalSeconds, millisecondsPart})
 	return hash
 }
 
@@ -206,12 +206,12 @@ func AddHeaders(header map[string]string, w http.ResponseWriter) {
 	}
 }
 
-func (server *GoSlowServer) CreateDefaultRules() {
+func (server *Server) CreateDefaultRules() {
 	server.CreateDelayRules()
 	server.CreateStatusRules()
 }
 
-func (server *GoSlowServer) CreateDelayRules() {
+func (server *Server) CreateDelayRules() {
 	for delay := 0; delay <= MAX_DELAY; delay++ {
 		delayHost := strconv.Itoa(delay)
 		delayInSeconds := time.Duration(delay) * time.Second
@@ -226,7 +226,7 @@ func EmptyHeader() map[string]string {
 	return make(map[string]string)
 }
 
-func (server *GoSlowServer) CreateStatusRules() {
+func (server *Server) CreateStatusRules() {
 	for status := MIN_STATUS; status <= MAX_STATUS; status++ {
 		statusHost := strconv.Itoa(status)
 		header := server.HeaderFor(status)
@@ -235,7 +235,7 @@ func (server *GoSlowServer) CreateStatusRules() {
 	}
 }
 
-func (server *GoSlowServer) HeaderFor(status int) map[string]string {
+func (server *Server) HeaderFor(status int) map[string]string {
 	_, isRedirect := REDIRECT_STATUS[status]
 	if isRedirect {
 		// TODO: check that protocol-independent location is legal HTTP
@@ -246,7 +246,7 @@ func (server *GoSlowServer) HeaderFor(status int) map[string]string {
 	return EmptyHeader()
 }
 
-func (server *GoSlowServer) ListenAndServe() error {
-	log.Printf("listening on %s", server.Config.address)
-	return http.ListenAndServe(server.Config.address, server)
+func (server *Server) ListenAndServe() error {
+	log.Printf("listening on %s", server.config.address)
+	return http.ListenAndServe(server.config.address, server)
 }

@@ -6,7 +6,7 @@ import (
 
 func main() {
 	config := NewConfigFromArgs()
-	server := NewGoSlowServer(config)
+	server := NewServer(config)
 
 	log.Fatal(server.ListenAndServe())
 }
