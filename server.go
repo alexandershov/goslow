@@ -153,7 +153,7 @@ func (server *GoSlowServer) CreateRuleFromRequest(subdomain string, w http.Respo
 	delay := 0
 	path := server.GetConfigPath(r)
 	delay, _ = strconv.Atoi(values.Get("delay"))
-	err = server.storage.CreateRule(&Rule{site: subdomain, responseStatus: 200, headers: EmptyHeader(),
+	err = server.storage.UpsertRule(&Rule{site: subdomain, responseStatus: 200, headers: EmptyHeader(),
 		path: path, method: values.Get("method"),
 		responseBody: string(payload), delay: time.Duration(delay) * time.Second})
 	log.Print(err)
@@ -216,7 +216,7 @@ func (server *GoSlowServer) CreateDelayRules() {
 		delayHost := strconv.Itoa(delay)
 		delayInSeconds := time.Duration(delay) * time.Second
 
-		server.storage.CreateRule(&Rule{site: delayHost, headers: EmptyHeader(), delay: delayInSeconds,
+		server.storage.UpsertRule(&Rule{site: delayHost, headers: EmptyHeader(), delay: delayInSeconds,
 			responseStatus: 200, responseBody: DEFAULT_RESPONSE,
 		})
 	}
@@ -230,7 +230,7 @@ func (server *GoSlowServer) CreateStatusRules() {
 	for status := MIN_STATUS; status <= MAX_STATUS; status++ {
 		statusHost := strconv.Itoa(status)
 		header := server.HeaderFor(status)
-		server.storage.CreateRule(&Rule{site: statusHost, responseStatus: status,
+		server.storage.UpsertRule(&Rule{site: statusHost, responseStatus: status,
 			headers: header, responseBody: DEFAULT_RESPONSE})
 	}
 }

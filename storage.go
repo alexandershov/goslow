@@ -21,14 +21,14 @@ WHERE site = $1 AND path = $2 AND method = $3
 
 const CREATE_RULE_SQL = `
 INSERT INTO rules
-(host, site, method, headers, delay, response_status, response_body)
+(site, method, headers, delay, response_status, response_body)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
 `
 
-const GET_RULES_SQL = `
+const GET_SITE_RULES_SQL = `
 SELECT site, path, method, headers, delay, response_status, response_body
 FROM rules
-WHERE host = $1
+WHERE site = $1
 ORDER BY LENGTH(path) DESC, LENGTH(method) DESC
 `
 
@@ -77,7 +77,7 @@ func (storage *Storage) FindRuleMatching(site string, req *http.Request) (rule *
 
 func (storage *Storage) getSiteRules(site string) ([]*Rule, error) {
 	rules := make([]*Rule, 0)
-	rows, err := storage.db.Query(storage.dialectify(GET_RULES_SQL), site)
+	rows, err := storage.db.Query(storage.dialectify(GET_SITE_RULES_SQL), site)
 	if err != nil {
 		return rules, err
 	}
@@ -102,13 +102,13 @@ func (storage *Storage) dialectify(sql string) string {
 
 func makeRule(rows *sql.Rows) (*Rule, error) {
 	rule := new(Rule)
-	var headers string
+	var headersJson string
 	var delay int64
-	rows.Scan(&rule.site, &rule.path, &rule.method, &headers, &delay, &rule.responseStatus,
+	rows.Scan(&rule.site, &rule.path, &rule.method, &headersJson, &delay, &rule.responseStatus,
 		&rule.responseBody)
 	rule.delay = time.Duration(delay)
 	var err error
-	rule.headers, err = jsonToMap(headers)
+	rule.headers, err = jsonToMap(headersJson)
 	return rule, err
 }
 
@@ -118,23 +118,23 @@ func jsonToMap(js string) (map[string]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	return makeStringMap(object)
+	return objectToStringMap(object)
 }
 
-func makeStringMap(object map[string]interface{}) (map[string]string, error) {
+func objectToStringMap(object map[string]interface{}) (map[string]string, error) {
 	m := make(map[string]string)
 	for key, value := range object {
 		switch value.(type) {
 		case string:
 			m[key] = value.(string)
 		default:
-			return nil, errors.New(fmt.Sprintf("Expecting string, got %v", value))
+			return nil, errors.New(fmt.Sprintf("Expecting string, got %+v", value))
 		}
 	}
 	return m, nil
 }
 
-func (storage *Storage) CreateRule(rule *Rule) error {
+func (storage *Storage) UpsertRule(rule *Rule) error {
   tx, err := storage.db.Begin()
   if err != nil {
       return err
@@ -145,23 +145,22 @@ func (storage *Storage) CreateRule(rule *Rule) error {
 		return err
 	}
 	_, err = tx.Exec(storage.dialectify(CREATE_RULE_SQL), rule.site, rule.path, rule.method,
-		MapToJson(rule.headers), rule.delay, rule.responseStatus, rule.responseBody)
-  err = tx.Commit()
-	return err
+		stringMapToJson(rule.headers), rule.delay, rule.responseStatus, rule.responseBody)
+  return tx.Commit()
 }
 
-func MapToJson(m map[string]string) string {
+func stringMapToJson(m map[string]string) string {
 	b, _ := json.Marshal(m)
 	return string(b)
 }
 
-func (storage *Storage) CreateSite(domain string) error {
-	_, err := storage.db.Exec(storage.dialectify(CREATE_SITE_SQL), domain)
+func (storage *Storage) CreateSite(site string) error {
+	_, err := storage.db.Exec(storage.dialectify(CREATE_SITE_SQL), site)
 	return err
 }
 
-func (storage *Storage) ContainsSite(domain string) (bool, error) {
-	rows, err := storage.db.Query(storage.dialectify(GET_SITE_SQL), domain)
+func (storage *Storage) ContainsSite(site string) (bool, error) {
+	rows, err := storage.db.Query(storage.dialectify(GET_SITE_SQL), site)
 	if err != nil {
 		return false, err
 	}
