@@ -33,29 +33,24 @@ func NewServer(config *Config) *Server {
 	}
 
 	server := &Server{config: config, storage: storage,
-		hasher: NewHasher(config.keySalt, config.minKeyLength)}
+		hasher: NewHasher(config.siteSalt, config.minSiteLength)}
 	if config.createDefaultRules {
-		if config.singleDomainUrlPath != "" {
-			log.Fatal("You can't use both --single-domain-path and --create-default-rules options")
-
-		} else {
 			server.CreateDefaultRules()
-		}
 	}
 	return server
 }
 
-func NewHasher(salt string, minKeyLength int) *hashids.HashID {
+func NewHasher(salt string, minLength int) *hashids.HashID {
 	hd := hashids.NewData()
 	hd.Salt = salt
-	hd.MinLength = minKeyLength
+	hd.MinLength = minLength
 	hd.Alphabet = "abcdefghijklmnopqrstuvwxyz1234567890"
 	return hashids.NewWithData(hd)
 }
 
-func (server *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (server *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	log.Printf("%s %s", r.Method, r.URL.Path)
-	AllowCrossDomainRequests(w, r)
+	allowCrossDomainRequests(w, r)
 	switch {
 	case r.Method == "OPTIONS":
 		return
@@ -117,7 +112,7 @@ func (server *Server) GetKey(r *http.Request) string {
 }
 
 // TODO: check crossbrowser compatibility
-func AllowCrossDomainRequests(w http.ResponseWriter, r *http.Request) {
+func allowCrossDomainRequests(w http.ResponseWriter, r *http.Request) {
 	header := w.Header()
 	header.Set("Access-Control-Allow-Origin", "*")
 	header.Set("Access-Control-Allow-Credentials", "true")
