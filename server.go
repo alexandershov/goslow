@@ -20,6 +20,9 @@ const MAX_STATUS = 599
 
 var REDIRECT_STATUS map[int]bool = map[int]bool{301: true, 302: true}
 
+const MAX_GENERATE_SITE_NAME_ATTEMPTS = 5
+const DURATION_BETWEEN_GENERATE_SITE_NAME_ATTEMPTS = time.Duration(10) * time.Millisecond
+
 type Server struct {
 	config  *Config
 	storage *Storage
@@ -35,7 +38,7 @@ func NewServer(config *Config) *Server {
 	server := &Server{config: config, storage: storage,
 		hasher: NewHasher(config.siteSalt, config.minSiteLength)}
 	if config.createDefaultRules {
-			server.CreateDefaultRules()
+		server.CreateDefaultRules()
 	}
 	return server
 }
@@ -49,25 +52,28 @@ func NewHasher(salt string, minLength int) *hashids.HashID {
 }
 
 func (server *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	log.Printf("%s %s", r.Method, r.URL.Path)
-	allowCrossDomainRequests(w, r)
+	log.Printf("%s %s", req.Method, req.URL.Path)
+	allowCrossDomainRequests(w, req)
 	switch {
-	case r.Method == "OPTIONS":
-		return
-	case server.IsCreateRequest(r):
-		server.HandleCreateSubdomain(w, r)
-		return
-	case server.IsConfigRequest(r):
-		log.Printf("Got config request, key: <%s>", server.GetKey(r))
-		server.CreateRuleFromRequest(server.GetKey(r), w, r)
-		return
+	case server.isOptionsRequest(req):
+		// do nothing
+	case server.isCreateRequest(req):
+		server.createSite(w, req)
+	case server.isConfigRequest(req):
+		server.createRuleFromRequest(server.GetKey(req), w, req)
+	default:
+		server.respondFromRule(w, req)
 	}
-	rule, found, err := server.storage.FindRuleMatching(server.GetKey(r), r)
+}
+
+func (server *Server) respondFromRule(w http.ResponseWriter, req *http.Request) {
+	rule, found, err := server.storage.FindRuleMatching(server.GetKey(req), req)
 	if err != nil {
 		log.Print(err)
 		http.Error(w, "Internal error. For real.", 500)
 		return
 	}
+
 	if found {
 		ApplyRule(rule, w)
 	} else {
@@ -75,7 +81,11 @@ func (server *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func (server *Server) IsCreateRequest(r *http.Request) bool {
+func (server *Server) isOptionsRequest(req *http.Request) bool {
+	return req.Method == "OPTIONS"
+}
+
+func (server *Server) isCreateRequest(r *http.Request) bool {
 	if r.Method != "POST" {
 		return false
 	}
@@ -86,7 +96,7 @@ func (server *Server) IsCreateRequest(r *http.Request) bool {
 	return GetSubdomain(r.Host) == "create"
 }
 
-func (server *Server) IsConfigRequest(r *http.Request) bool {
+func (server *Server) isConfigRequest(r *http.Request) bool {
 	if r.Method != "POST" {
 		return false
 	}
@@ -105,7 +115,7 @@ func (server *Server) GetKey(r *http.Request) string {
 	if server.IsSingleDomain() {
 		return ""
 	}
-	if server.IsConfigRequest(r) {
+	if server.isConfigRequest(r) {
 		return strings.TrimPrefix(GetSubdomain(r.Host), "admin-")
 	}
 	return GetSubdomain(r.Host)
@@ -123,17 +133,16 @@ func GetSubdomain(url string) string {
 	return strings.Split(url, ".")[0]
 }
 
-func (server *Server) HandleCreateSubdomain(w http.ResponseWriter, r *http.Request) {
-	subdomain, err := server.CreateNewSubdomain(5)
-
-	if err == nil {
-		server.CreateRuleFromRequest(subdomain, w, r)
-	} else {
-		io.WriteString(w, fmt.Sprintf("ERROR: %s", err))
+func (server *Server) createSite(w http.ResponseWriter, req *http.Request) {
+	site, err := server.generateSiteName(MAX_GENERATE_SITE_NAME_ATTEMPTS)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
+	server.createRuleFromRequest(site, w, req)
 }
 
-func (server *Server) CreateRuleFromRequest(subdomain string, w http.ResponseWriter, r *http.Request) {
+func (server *Server) createRuleFromRequest(subdomain string, w http.ResponseWriter, r *http.Request) {
 	payload, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		io.WriteString(w, fmt.Sprintf("ERROR: %s", err))
@@ -162,27 +171,26 @@ func (server *Server) GetConfigPath(r *http.Request) string {
 	return r.URL.Path
 }
 
-func (server *Server) CreateNewSubdomain(maxAttempts int) (string, error) {
-	for {
-		subdomain := server.GenerateSubdomainName()
-		err := server.storage.CreateSite(subdomain)
+func (server *Server) generateSiteName(maxAttempts uint) (string, error) {
+	var err error
+	for ; maxAttempts > 0; maxAttempts-- {
+		site, err := server.generateSiteNameFrom(time.Now().UTC().UnixNano())
+		if err != nil {
+			break
+		}
+		err = server.storage.CreateSite(site)
 		if err == nil {
-			return subdomain, nil
+			return site, nil
 		}
-		if maxAttempts <= 0 {
-			return "", err
-		}
-		maxAttempts--
-		time.Sleep(time.Duration(10) * time.Millisecond)
+		time.Sleep(DURATION_BETWEEN_GENERATE_SITE_NAME_ATTEMPTS)
 	}
+	return "", err
 }
 
-func (server *Server) GenerateSubdomainName() string {
-	nanoseconds := time.Now().UTC().UnixNano()
+func (server *Server) generateSiteNameFrom(nanoseconds int64) (string, error) {
 	totalSeconds := int(nanoseconds / 1000000000)
 	millisecondsPart := int((nanoseconds / 1000000) % 1000)
-	hash, _ := server.hasher.Encode([]int{totalSeconds, millisecondsPart})
-	return hash
+	return server.hasher.Encode([]int{totalSeconds, millisecondsPart})
 }
 
 func ApplyRule(rule *Rule, w http.ResponseWriter) {

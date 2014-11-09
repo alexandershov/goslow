@@ -9,8 +9,8 @@ type Config struct {
 	address             string
 	driver              string
 	dataSource          string
-	minSiteLength        int
-	siteSalt             string
+	minSiteLength       int
+	siteSalt            string
 	createDefaultRules  bool
 	singleDomainUrlPath string
 }
@@ -19,8 +19,8 @@ var DEFAULT_CONFIG *Config = &Config{
 	address:             ":5103",
 	driver:              "memory",
 	dataSource:          "",
-	minSiteLength:        6,
-	siteSalt:             "",
+	minSiteLength:       6,
+	siteSalt:            "",
 	createDefaultRules:  false,
 	singleDomainUrlPath: "/goslow/",
 }
@@ -49,7 +49,7 @@ func (config *Config) defineFlags() {
 
 func (config *Config) checkFlags() {
 	if config.createDefaultRules && config.singleDomainUrlPath != "" {
-			log.Fatal("You can't use both --single-domain-url-path and --create-default-rules options")
-		}
+		log.Fatal("You can't use both --single-domain-url-path and --create-default-rules options")
+	}
 
 }

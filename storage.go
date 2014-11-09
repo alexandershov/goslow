@@ -135,18 +135,18 @@ func objectToStringMap(object map[string]interface{}) (map[string]string, error)
 }
 
 func (storage *Storage) UpsertRule(rule *Rule) error {
-  tx, err := storage.db.Begin()
-  if err != nil {
-      return err
-  }
-  defer tx.Rollback()
+	tx, err := storage.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
 	_, err = tx.Exec(storage.dialectify(DELETE_RULE_SQL), rule.site, rule.path, rule.method)
 	if err != nil {
 		return err
 	}
 	_, err = tx.Exec(storage.dialectify(CREATE_RULE_SQL), rule.site, rule.path, rule.method,
 		stringMapToJson(rule.headers), rule.delay, rule.responseStatus, rule.responseBody)
-  return tx.Commit()
+	return tx.Commit()
 }
 
 func stringMapToJson(m map[string]string) string {
