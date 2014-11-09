@@ -22,7 +22,7 @@ const MIN_STATUS = 100
 const MAX_STATUS = 599
 
 const CREATE_SUBDOMAIN_NAME = "create"
-const CHANGE_SITE_PREFIX = "admin-"
+const ADD_RULE_PREFIX = "admin-"
 const BUG_REPORTS_EMAIL = "codumentary.com@gmail.com"
 
 
@@ -148,14 +148,12 @@ func (server *Server) generateUniqueSiteName(maxAttempts uint) (string, error) {
   for ; maxAttempts > 0; maxAttempts-- {
     site, err := server.makeSiteNameFrom(generateUniqueNumbers())
     if err != nil {
-      log.Print(err)
       break
     }
     err = server.storage.CreateSite(site)
     if err == nil {
       return site, nil
     }
-    log.Print(err)
     time.Sleep(DURATION_BETWEEN_GENERATE_SITE_NAME_ATTEMPTS)
   }
   return "", errors.New(fmt.Sprintf(`Can't create site.
@@ -192,24 +190,32 @@ func (server *Server) makeRule(site string, req *http.Request) (*Rule, error) {
     return nil, err
   }
   path := server.getPath(req)
-  delay, err := strconv.ParseFloat(values.Get("delay"), 64)
+  delay, err := getDelay(values)
   if err != nil {
-      return nil, err
+    return nil, err
   }
   return &Rule{site: site, responseStatus: http.StatusOK, headers: EMPTY_HEADERS,
     path: path, method: values.Get("method"),
-    responseBody: string(body), delay: time.Duration(delay) * time.Second}, nil
+    responseBody: string(body), delay: delay}, nil
+}
+
+func getDelay(values url.Values) (time.Duration, error) {
+  delayInSeconds, err := strconv.ParseFloat(values.Get("delay"), 64)
+  if err != nil {
+      return time.Duration(0), err
+  }
+  return time.Duration(delayInSeconds * 1000) * time.Millisecond, nil
 }
 
 func (server *Server) handleError(err error, w http.ResponseWriter) {
-  http.Error(w, err.Error(), http.StatusInternalServerError)
+  log.Print(err)
+  http.Error(w, fmt.Sprintf("Internal error: %s. For real", err), http.StatusInternalServerError)
 }
 
 func (server *Server) respondFromRule(w http.ResponseWriter, req *http.Request) {
 	rule, found, err := server.storage.FindRuleMatching(server.getSite(req), req)
 	if err != nil {
-		log.Print(err)
-		http.Error(w, "Internal error. For real.", http.StatusInternalServerError)
+		server.handleError(err, w)
 		return
 	}
 
@@ -227,7 +233,7 @@ func (server *Server) isAddRule(r *http.Request) bool {
 	if server.isInSingleSiteMode() {
 		return server.pathRegexp.MatchString(r.URL.Path)
 	}
-	return strings.HasPrefix(getSubdomain(r.Host), CHANGE_SITE_PREFIX)
+	return strings.HasPrefix(getSubdomain(r.Host), ADD_RULE_PREFIX)
 }
 
 func (server *Server) handleAddRule(w http.ResponseWriter, req *http.Request) {
@@ -245,7 +251,7 @@ func (server *Server) getSite(req *http.Request) string {
 	}
   subdomain := getSubdomain(req.Host)
 	if server.isAddRule(req) {
-		return strings.TrimPrefix(subdomain, CHANGE_SITE_PREFIX)
+		return strings.TrimPrefix(subdomain, ADD_RULE_PREFIX)
 	}
 	return subdomain
 }
@@ -264,8 +270,6 @@ func ensureHasPrefix(s, prefix string) string {
   }
   return s
 }
-
-
 
 func ApplyRule(rule *Rule, w http.ResponseWriter) {
 	log.Printf("sleeping for %v", rule.delay)

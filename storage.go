@@ -151,7 +151,7 @@ func (storage *Storage) UpsertRule(rule *Rule) error {
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer tx.Commit()
 	_, err = tx.Exec(storage.dialectify(DELETE_RULE_SQL), rule.site, rule.path, rule.method)
 	if err != nil {
 		return err
