@@ -18,7 +18,7 @@ const MAX_DELAY = 99
 const MIN_STATUS = 100
 const MAX_STATUS = 599
 
-var REDIRECT_STATUS map[int]bool = map[int]bool{301: true, 302: true}
+var REDIRECT_STATUSES map[int]bool = map[int]bool{301: true, 302: true}
 var EMPTY_HEADERS map[string]string = make(map[string]string)
 
 const MAX_GENERATE_SITE_NAME_ATTEMPTS = 5
@@ -37,14 +37,14 @@ func NewServer(config *Config) *Server {
 	}
 
 	server := &Server{config: config, storage: storage,
-		hasher: NewHasher(config.siteSalt, config.minSiteLength)}
+		hasher: newHasher(config.siteSalt, config.minSiteLength)}
 	if config.createDefaultRules {
 		server.createDefaultRules()
 	}
 	return server
 }
 
-func NewHasher(salt string, minLength int) *hashids.HashID {
+func newHasher(salt string, minLength int) *hashids.HashID {
 	hd := hashids.NewData()
 	hd.Salt = salt
 	hd.MinLength = minLength
@@ -54,18 +54,45 @@ func NewHasher(salt string, minLength int) *hashids.HashID {
 
 func (server *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	log.Printf("%s %s", req.Method, req.URL.Path)
-	allowCrossDomainRequests(w, req)
-
 	switch {
-	case server.isOptionsRequest(req):
-		// do nothing
-	case server.isCreateRequest(req):
+	case server.isOptions(req):
+   allowCrossDomainRequests(w, req)
+	case server.isCreateSite(req):
 		server.createSite(w, req)
-	case server.isConfigRequest(req):
+	case server.isChangeSite(req):
 		server.createRuleFromRequest(server.GetKey(req), w, req)
 	default:
+    allowCrossDomainRequests(w, req)
 		server.respondFromRule(w, req)
 	}
+}
+
+func (server *Server) isOptions(req *http.Request) bool {
+  return req.Method == "OPTIONS"
+}
+
+// TODO: check crossbrowser compatibility
+func allowCrossDomainRequests(w http.ResponseWriter, req *http.Request) {
+  header := w.Header()
+  header.Set("Access-Control-Allow-Origin", "*")
+  header.Set("Access-Control-Allow-Credentials", "true")
+  header["Access-Control-Allow-Headers"] = req.Header["Access-Control-Request-Headers"]
+}
+
+func (server *Server) isCreateSite(req *http.Request) bool {
+  if req.Method != "POST" {
+    return false
+  }
+
+  if server.isInSingleSiteMode() {
+    return false
+  }
+  return GetSubdomain(req.Host) == "create"
+}
+
+
+func (server *Server) isInSingleSiteMode() bool {
+  return server.config.singleDomainUrlPath != ""
 }
 
 func (server *Server) respondFromRule(w http.ResponseWriter, req *http.Request) {
@@ -83,53 +110,33 @@ func (server *Server) respondFromRule(w http.ResponseWriter, req *http.Request) 
 	}
 }
 
-func (server *Server) isOptionsRequest(req *http.Request) bool {
-	return req.Method == "OPTIONS"
-}
 
-func (server *Server) isCreateRequest(r *http.Request) bool {
+
+
+
+func (server *Server) isChangeSite(r *http.Request) bool {
 	if r.Method != "POST" {
 		return false
 	}
-
-	if server.IsSingleDomain() {
-		return false
-	}
-	return GetSubdomain(r.Host) == "create"
-}
-
-func (server *Server) isConfigRequest(r *http.Request) bool {
-	if r.Method != "POST" {
-		return false
-	}
-	if server.IsSingleDomain() {
+	if server.isInSingleSiteMode() {
 		return strings.HasPrefix(r.URL.Path, server.config.singleDomainUrlPath)
 
 	}
 	return strings.HasPrefix(GetSubdomain(r.Host), "admin-")
 }
 
-func (server *Server) IsSingleDomain() bool {
-	return server.config.singleDomainUrlPath != ""
-}
 
-func (server *Server) GetKey(r *http.Request) string {
-	if server.IsSingleDomain() {
+func (server *Server) GetKey(req *http.Request) string {
+	if server.isInSingleSiteMode() {
 		return ""
 	}
-	if server.isConfigRequest(r) {
-		return strings.TrimPrefix(GetSubdomain(r.Host), "admin-")
+	if server.isChangeSite(req) {
+		return strings.TrimPrefix(GetSubdomain(req.Host), "admin-")
 	}
-	return GetSubdomain(r.Host)
+	return GetSubdomain(req.Host)
 }
 
-// TODO: check crossbrowser compatibility
-func allowCrossDomainRequests(w http.ResponseWriter, r *http.Request) {
-	header := w.Header()
-	header.Set("Access-Control-Allow-Origin", "*")
-	header.Set("Access-Control-Allow-Credentials", "true")
-	header["Access-Control-Allow-Headers"] = r.Header["Access-Control-Request-Headers"]
-}
+
 
 func GetSubdomain(url string) string {
 	return strings.Split(url, ".")[0]
@@ -167,7 +174,7 @@ func (server *Server) createRuleFromRequest(subdomain string, w http.ResponseWri
 }
 
 func (server *Server) GetConfigPath(r *http.Request) string {
-	if server.IsSingleDomain() {
+	if server.isInSingleSiteMode() {
 		return "/" + strings.TrimPrefix(r.URL.Path, server.config.singleDomainUrlPath)
 	}
 	return r.URL.Path
@@ -199,14 +206,14 @@ func ApplyRule(rule *Rule, w http.ResponseWriter) {
 	log.Printf("sleeping for %v", rule.delay)
 	time.Sleep(rule.delay)
 
-	AddHeaders(rule.headers, w)
+	addHeaders(rule.headers, w)
 	w.WriteHeader(rule.responseStatus)
 	io.WriteString(w, rule.responseBody)
 }
 
-func AddHeaders(header map[string]string, w http.ResponseWriter) {
+func addHeaders(headers map[string]string, w http.ResponseWriter) {
 	responseHeader := w.Header()
-	for key, value := range header {
+	for key, value := range headers {
 		responseHeader.Add(key, value)
 	}
 }
@@ -228,16 +235,16 @@ func (server *Server) createDelayRules() {
 }
 
 func (server *Server) createStatusRules() {
-	for status := MIN_STATUS; status <= MAX_STATUS; status++ {
-		statusHost := strconv.Itoa(status)
-		header := server.headerFor(status)
-		server.storage.UpsertRule(&Rule{site: statusHost, responseStatus: status,
-			headers: header, responseBody: DEFAULT_RESPONSE})
+	for i := MIN_STATUS; i <= MAX_STATUS; i++ {
+		statusSite := strconv.Itoa(i)
+		headers := server.headersForStatus(i)
+		server.storage.UpsertRule(&Rule{site: statusSite, responseStatus: i,
+			headers: headers, responseBody: DEFAULT_RESPONSE})
 	}
 }
 
-func (server *Server) headerFor(status int) map[string]string {
-	_, isRedirect := REDIRECT_STATUS[status]
+func (server *Server) headersForStatus(status int) map[string]string {
+	_, isRedirect := REDIRECT_STATUSES[status]
 	if isRedirect {
 		// TODO: check that protocol-independent location is legal HTTP
 		// TODO: header should respect current port
