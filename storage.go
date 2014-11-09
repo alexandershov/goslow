@@ -136,6 +136,10 @@ func makeStringMap(object map[string]interface{}) (map[string]string, error) {
 
 func (storage *Storage) CreateRule(rule *Rule) error {
   tx, err := storage.db.Begin()
+  if err != nil {
+      return err
+  }
+  defer tx.Rollback()
 	_, err = tx.Exec(storage.dialectify(DELETE_RULE_SQL), rule.site, rule.path, rule.method)
 	if err != nil {
 		return err
