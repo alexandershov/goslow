@@ -270,6 +270,7 @@ func ensureHasPrefix(s, prefix string) string {
 }
 
 func ApplyRule(rule *Rule, w http.ResponseWriter) {
+  log.Printf("rule.Site %v", rule.Site)
 	log.Printf("sleeping for %v", rule.Delay)
 	time.Sleep(rule.Delay)
 
