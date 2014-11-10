@@ -128,6 +128,10 @@ func (server *Server) handleCreateSite(w http.ResponseWriter, req *http.Request)
     server.handleError(err, w)
     return
   }
+  if req.FormValue("output") == "short" {
+    fmt.Fprintf(w, rule.Site)
+    return
+  }
   CREATE_SITE_TEMPLATE.Execute(w, rule)
   io.WriteString(w, "\n")
   ADD_RULE_TEMPLATE.Execute(w, rule)
@@ -198,6 +202,10 @@ func (server *Server) makeRule(site string, req *http.Request) (*Rule, error) {
 }
 
 func getDelay(values url.Values) (time.Duration, error) {
+  _, contains := values["delay"]
+  if !contains {
+    return time.Duration(0), nil
+  }
   delayInSeconds, err := strconv.ParseFloat(values.Get("delay"), 64)
   if err != nil {
       return time.Duration(0), err
