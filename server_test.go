@@ -49,9 +49,7 @@ func TestRuleCreation(t *testing.T)  {
   addRule(server, &Rule{Site: site, Path: "/test", ResponseBody: "hop", Method: "GET"})
   shouldBeEqual(t, readBody(GET(server.URL, "/test", makeHost(site))), "hop")
   resp := POST(server.URL, "/test", makeHost(site), "")
-  if resp.StatusCode != 404 {
-    t.Errorf("response status code should be 404, got %d", resp.StatusCode)
-  }
+  intShouldBeEqual(t, 404, resp.StatusCode)
   addRule(server, &Rule{Site: site, Path: "/test", ResponseBody: "for POST", Method: "POST",
   Delay: time.Duration(100) * time.Millisecond})
   shouldBeEqual(t, readBody(GET(server.URL, "/test", makeHost(site))), "hop")
