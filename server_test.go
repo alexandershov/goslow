@@ -7,11 +7,17 @@ import ("testing"
 "net/http/httptest"
 "log"
 "fmt"
+"strconv"
 "strings"
 "io/ioutil"
 )
 
 const HOST = "goslow.link"
+
+type testCase struct {
+  createDefaultRules bool
+
+}
 
 func TestZeroSite(t *testing.T) {
   server := newSubDomainServer(true)
@@ -24,6 +30,15 @@ func TestDelay(t *testing.T) {
   defer server.Close()
   shouldRespondIn(t, createGET(server.URL, "/", makeHost("0")), 0, 0.1)
   shouldRespondIn(t, createGET(server.URL, "/", makeHost("1")), 1, 1.1)
+}
+
+func TestStatus(t *testing.T) {
+  server := newSubDomainServer(true)
+  defer server.Close()
+  for _, statusCode := range []int{200, 404, 500} {
+    resp := GET(server.URL, "/", makeHost(strconv.Itoa(statusCode)))
+    intShouldBeEqual(t, statusCode, resp.StatusCode)
+  }
 }
 
 func TestRuleCreation(t *testing.T)  {
@@ -91,6 +106,13 @@ func shouldBeEqual(t *testing.T, expected, actual string) {
     t.Errorf("<<%v>> != <<%v>>", expected, actual)
   }
 }
+
+func intShouldBeEqual(t *testing.T, expected, actual int) {
+  if expected != actual {
+    t.Errorf("<<%v>> != <<%v>>", expected, actual)
+  }
+}
+
 
 func shouldRespondIn(t *testing.T, req *http.Request, min, max float64) {
   start := time.Now()
