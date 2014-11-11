@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"github.com/speps/go-hashids"
 	"io"
@@ -8,12 +9,11 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
-  "regexp"
-  "text/template"
 	"strings"
+	"text/template"
 	"time"
-  "errors"
 )
 
 const DEFAULT_RESPONSE = `{"default": "response"}`
@@ -25,28 +25,27 @@ const CREATE_SUBDOMAIN_NAME = "create"
 const ADD_RULE_PREFIX = "admin-"
 const BUG_REPORTS_EMAIL = "codumentary.com@gmail.com"
 
-
 var REDIRECT_STATUSES = map[int]bool{301: true, 302: true}
 var EMPTY_HEADERS = map[string]string{}
 
 var CREATE_SITE_TEMPLATE = template.Must(template.New("create site").Parse(
-`Site {{.Site }} was created successfully.
+	`Site {{.Site }} was created successfully.
 
 Use admin-{{.Site }} subdomain for configuration.
 `))
 
 var ADD_RULE_TEMPLATE = template.Must(template.New("add rule").Parse(
-`Path {{.Path }} now responds with {{ .ResponseBody }}.
+	`Path {{.Path }} now responds with {{ .ResponseBody }}.
 `))
 
 const MAX_GENERATE_SITE_NAME_ATTEMPTS = 5
 const DURATION_BETWEEN_GENERATE_SITE_NAME_ATTEMPTS = time.Duration(10) * time.Millisecond
 
 type Server struct {
-	config  *Config
-	storage *Storage
-	hasher  *hashids.HashID
-  pathRegexp *regexp.Regexp
+	config     *Config
+	storage    *Storage
+	hasher     *hashids.HashID
+	pathRegexp *regexp.Regexp
 }
 
 func NewServer(config *Config) *Server {
@@ -56,9 +55,9 @@ func NewServer(config *Config) *Server {
 	}
 
 	server := &Server{config: config, storage: storage,
-		hasher: newHasher(config.siteSalt, config.minSiteLength),
-    pathRegexp: regexp.MustCompile(fmt.Sprintf("%s\\b.*", config.singleDomainUrlPath)),
-    }
+		hasher:     newHasher(config.siteSalt, config.minSiteLength),
+		pathRegexp: regexp.MustCompile(fmt.Sprintf("%s(?:\\b.*|$)", config.singleDomainUrlPath)),
+	}
 	if config.createDefaultRules {
 		server.createDefaultRules()
 	}
@@ -123,18 +122,18 @@ func getSubdomain(url string) string {
 }
 
 func (server *Server) handleCreateSite(w http.ResponseWriter, req *http.Request) {
-  rule, err := server.createSite(req)
-  if err != nil {
-    server.handleError(err, w)
-    return
-  }
-  if req.FormValue("output") == "short" {
-    fmt.Fprintf(w, rule.Site)
-    return
-  }
-  CREATE_SITE_TEMPLATE.Execute(w, rule)
-  io.WriteString(w, "\n")
-  ADD_RULE_TEMPLATE.Execute(w, rule)
+	rule, err := server.createSite(req)
+	if err != nil {
+		server.handleError(err, w)
+		return
+	}
+	if req.FormValue("output") == "short" {
+		fmt.Fprintf(w, rule.Site)
+		return
+	}
+	CREATE_SITE_TEMPLATE.Execute(w, rule)
+	io.WriteString(w, "\n")
+	ADD_RULE_TEMPLATE.Execute(w, rule)
 }
 
 func (server *Server) createSite(req *http.Request) (*Rule, error) {
@@ -142,80 +141,80 @@ func (server *Server) createSite(req *http.Request) (*Rule, error) {
 	if err != nil {
 		return nil, err
 	}
-  rule, err := server.addRule(site, req)
-  return rule, err
+	rule, err := server.addRule(site, req)
+	return rule, err
 }
 
 func (server *Server) generateUniqueSiteName(maxAttempts uint) (string, error) {
-  for ; maxAttempts > 0; maxAttempts-- {
-    site, err := server.makeSiteNameFrom(generateUniqueNumbers())
-    if err != nil {
-      break
-    }
-    err = server.storage.CreateSite(site)
-    if err == nil {
-      return site, nil
-    }
-    time.Sleep(DURATION_BETWEEN_GENERATE_SITE_NAME_ATTEMPTS)
-  }
-  return "", errors.New(fmt.Sprintf(`Can't create site.
+	for ; maxAttempts > 0; maxAttempts-- {
+		site, err := server.makeSiteNameFrom(generateUniqueNumbers())
+		if err != nil {
+			break
+		}
+		err = server.storage.CreateSite(site)
+		if err == nil {
+			return site, nil
+		}
+		time.Sleep(DURATION_BETWEEN_GENERATE_SITE_NAME_ATTEMPTS)
+	}
+	return "", errors.New(fmt.Sprintf(`Can't create site.
 Try again in a few seconds or contact %s for help`, BUG_REPORTS_EMAIL))
 }
 
 func (server *Server) makeSiteNameFrom(numbers []int) (string, error) {
-  return server.hasher.Encode(numbers)
+	return server.hasher.Encode(numbers)
 }
 
 func generateUniqueNumbers() []int {
-  utc := time.Now().UTC()
-  seconds := int(utc.Unix()) // TODO: fix me at 2037-12-31
-  milliseconds := (utc.Nanosecond() / 1000000) % 1000
-  return []int{seconds, milliseconds}
+	utc := time.Now().UTC()
+	seconds := int(utc.Unix()) // TODO: fix me at 2037-12-31
+	milliseconds := (utc.Nanosecond() / 1000000) % 1000
+	return []int{seconds, milliseconds}
 }
 
 func (server *Server) addRule(site string, req *http.Request) (*Rule, error) {
-  rule, err := server.makeRule(site, req)
-  if err != nil {
-    return nil, err
-  }
-  return rule, server.storage.UpsertRule(rule)
+	rule, err := server.makeRule(site, req)
+	if err != nil {
+		return nil, err
+	}
+	return rule, server.storage.UpsertRule(rule)
 }
 
 func (server *Server) makeRule(site string, req *http.Request) (*Rule, error) {
-  body, err := ioutil.ReadAll(req.Body)
-  if err != nil {
-    return nil, err
-  }
+	body, err := ioutil.ReadAll(req.Body)
+	if err != nil {
+		return nil, err
+	}
 
-  values, err := url.ParseQuery(req.URL.RawQuery)
-  if err != nil {
-    return nil, err
-  }
-  path := server.getPath(req)
-  delay, err := getDelay(values)
-  if err != nil {
-    return nil, err
-  }
-  return &Rule{Site: site, ResponseStatus: http.StatusOK, Headers: EMPTY_HEADERS,
-    Path: path, Method: values.Get("method"),
-    ResponseBody: string(body), Delay: delay}, nil
+	values, err := url.ParseQuery(req.URL.RawQuery)
+	if err != nil {
+		return nil, err
+	}
+	path := server.getPath(req)
+	delay, err := getDelay(values)
+	if err != nil {
+		return nil, err
+	}
+	return &Rule{Site: site, ResponseStatus: http.StatusOK, Headers: EMPTY_HEADERS,
+		Path: path, Method: values.Get("method"),
+		ResponseBody: string(body), Delay: delay}, nil
 }
 
 func getDelay(values url.Values) (time.Duration, error) {
-  _, contains := values["delay"]
-  if !contains {
-    return time.Duration(0), nil
-  }
-  delayInSeconds, err := strconv.ParseFloat(values.Get("delay"), 64)
-  if err != nil {
-      return time.Duration(0), err
-  }
-  return time.Duration(delayInSeconds * 1000) * time.Millisecond, nil
+	_, contains := values["delay"]
+	if !contains {
+		return time.Duration(0), nil
+	}
+	delayInSeconds, err := strconv.ParseFloat(values.Get("delay"), 64)
+	if err != nil {
+		return time.Duration(0), err
+	}
+	return time.Duration(delayInSeconds*1000) * time.Millisecond, nil
 }
 
 func (server *Server) handleError(err error, w http.ResponseWriter) {
-  log.Print(err)
-  http.Error(w, fmt.Sprintf("Internal error: %s. For real", err), http.StatusInternalServerError)
+	log.Print(err)
+	http.Error(w, fmt.Sprintf("Internal error: %s. For real", err), http.StatusInternalServerError)
 }
 
 func (server *Server) respondFromRule(w http.ResponseWriter, req *http.Request) {
@@ -243,19 +242,19 @@ func (server *Server) isAddRule(r *http.Request) bool {
 }
 
 func (server *Server) handleAddRule(w http.ResponseWriter, req *http.Request) {
-  rule, err := server.addRule(server.getSite(req), req)
-  if err != nil {
-    server.handleError(err, w)
-    return
-  }
-  ADD_RULE_TEMPLATE.Execute(w, rule)
+	rule, err := server.addRule(server.getSite(req), req)
+	if err != nil {
+		server.handleError(err, w)
+		return
+	}
+	ADD_RULE_TEMPLATE.Execute(w, rule)
 }
 
 func (server *Server) getSite(req *http.Request) string {
 	if server.isInSingleSiteMode() {
 		return ""
 	}
-  subdomain := getSubdomain(req.Host)
+	subdomain := getSubdomain(req.Host)
 	if server.isAddRule(req) {
 		return strings.TrimPrefix(subdomain, ADD_RULE_PREFIX)
 	}
@@ -265,21 +264,19 @@ func (server *Server) getSite(req *http.Request) string {
 func (server *Server) getPath(req *http.Request) string {
 	if server.isInSingleSiteMode() {
 		path := strings.TrimPrefix(req.URL.Path, server.config.singleDomainUrlPath)
-    return ensureHasPrefix(path, "/")
+		return ensureHasPrefix(path, "/")
 	}
 	return req.URL.Path
 }
 
 func ensureHasPrefix(s, prefix string) string {
-  if !strings.HasPrefix(s, prefix) {
-    return prefix + s
-  }
-  return s
+	if !strings.HasPrefix(s, prefix) {
+		return prefix + s
+	}
+	return s
 }
 
 func ApplyRule(rule *Rule, w http.ResponseWriter) {
-  log.Printf("rule.Site %v", rule.Site)
-	log.Printf("sleeping for %v", rule.Delay)
 	time.Sleep(rule.Delay)
 
 	addHeaders(rule.Headers, w)

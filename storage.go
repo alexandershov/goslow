@@ -69,9 +69,9 @@ func NewStorage(driver string, dataSource string) (*Storage, error) {
 	if err != nil {
 		return nil, err
 	}
-  storage := &Storage{driver: driver, dataSource: dataSource, db: db}
+	storage := &Storage{driver: driver, dataSource: dataSource, db: db}
 	_, err = storage.db.Exec(storage.dialectify(CREATE_SCHEMA_SQL))
-  return storage, err
+	return storage, err
 }
 
 func (storage *Storage) FindRuleMatching(site string, req *http.Request) (rule *Rule, found bool, err error) {
@@ -158,9 +158,9 @@ func (storage *Storage) UpsertRule(rule *Rule) error {
 	}
 	_, err = tx.Exec(storage.dialectify(CREATE_RULE_SQL), rule.Site, rule.Path, rule.Method,
 		stringMapToJson(rule.Headers), rule.Delay, rule.ResponseStatus, rule.ResponseBody)
-  if err != nil {
-    return err
-  }
+	if err != nil {
+		return err
+	}
 	return tx.Commit()
 }
 
