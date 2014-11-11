@@ -1,5 +1,5 @@
 ## Why?
-Sometimes you need to test how your application handles slow/buggy
+There comes a time in life when you need to test how your application handles slow/buggy
 external API responses. Goslow can help you with that (as long as you can easily
   configure API server domain name).
 
@@ -16,17 +16,17 @@ time curl 10.goslow.link/me
 10.023 total
 ```
 
-Now, obviously, you got a canned JSON response that has no relation to graph API whatsoever.
+Well, almost set, because you got a JSON response that has no relation to graph API whatsoever.
 We'll get to that later.
 
 By the way, different endpoints and POST requests also work:
 ```shell
-echo "your payload"| time curl -d @- '10.goslow.link/me/feed?message="test"'
+time curl -X POST -d 'your payload' '10.goslow.link/me/feed?message="test"'
 {"goslow": "link"}
 10.123 total
 ```
 
-Need to simulate a 6 seconds delay? Just call *6.goslow.link* instead of *10.goslow.link*
+Need to simulate a 6 seconds delay? Just use *6.goslow.link* instead of *10.goslow.link*
 
 
 ```shell
@@ -42,7 +42,7 @@ time curl 99.goslow.link/me
 99.104 total
 ```
 
-Need to simulate a 500 seconds delay? We should use *500.goslow.link*, right?
+Need to simulate a 500 seconds delay? Use *500.goslow.link*, right?
 
 No. Domains *100.goslow.link*, *101.goslow.link*, ..., *599.goslow.link* respond with
 HTTP status code 100, 101, ..., 599 without any delay:
@@ -58,18 +58,18 @@ Internal Server Error
 
 ## Not-so-quick start
 If you want to specify JSON responses you want to get, then you need to, ahem, register.
-Registration is just a POST request
-to **create.goslow.link**.
+Registration is a POST request
+to **create.goslow.link**
 
 ```shell
-echo '{"my": "response"}' | curl -d @- 'create.goslow.link/users?delay=5'
+curl -d '{"my": "response"}' 'create.goslow.link/users?delay=5'
 Your goslow domain is: dk8kjs.goslow.link
 ...
 ```
 
-When you really do the POST request, you'll get a domain name different
-from the *dk8kjs.goslow.link*. (they're randomly generated) For the sake of example let's assume that randomly
-generated domain name is *dk8kjs.goslow.link*.
+In the real world your goslow domain will be different
+from the *dk8kjs.goslow.link*. (names are randomly generated) For the sake of example let's assume that randomly
+generated domain name is *dk8kjs.goslow.link*
 
 Now you can send requests to your domain:
 ```shell
@@ -78,22 +78,24 @@ time curl dk8kjs.goslow.link/users
 5.382 total
 ```
 
-And configure it with POST requests to *admin-dk8kjs.goslow.link*:
+And configure it with POST requests to *admin-dk8kjs.goslow.link*
+Let's make endpoint *dk8kjs.goslow.link/another/* to respond with **{"another": "response"}**
+and 3 seconds delay:
 ```shell
-echo '{"another": "response"}' | curl -d @- 'admin-dk8kjs.goslow.link/another/?delay=3'
+curl -d '{"another": "response"}' 'admin-dk8kjs.goslow.link/another/?delay=3'
 dk8kjs.goslow.link/another/ will now respond with 3 seconds delay.
 Response is '{"another": "response"}'
 ```
 
 Now you have two urls responding with different JSON and delay.
 ```shell
-time curl -d @- dk8kjs.goslow.link/another/
+time curl dk8kjs.goslow.link/another/
 '{"another": "response"}'
 3.182 total
 ```
 
 ```shell
-time curl -d @- dk8kjs.goslow.link/users
+time curl dk8kjs.goslow.link/users
 '{"my": "response"}'
 5.028 total
 ```
@@ -106,8 +108,9 @@ You can install goslow locally. You'll need the [golang](https://golang.org/) co
 
 ```shell
 # install dependencies
-go get github.com/alexandershov/goslow github.com/lib/pq \
-github.com/mattn/go-sqlite3 github.com/go-sql-driver/mysql \
+go get github.com/alexandershov/goslow \
+github.com/lib/pq                      \
+github.com/mattn/go-sqlite3            \
 github.com/speps/go-hashids
 
 # build
@@ -118,18 +121,18 @@ bin/goslow
 listening on :5103
 ```
 
-Local install of goslow runs in a single domain mode
-since nobody wants to deal with dynamically generated subdomain names on local machine.
+Local install of goslow runs in a single domain mode by default
+since nobody wants to deal with dynamically generated subdomain names on a local machine.
 You can configure goslow with the POST requests to /goslow/.
 ```shell
-echo '{"local": "response"}' | curl -d @- 'localhost:5103/goslow/feed?delay=4.3'
+curl -d '{"local": "response"}' 'localhost:5103/goslow/feed?delay=4.3'
 /feed is now responding with 4.3 seconds delay.
 Response is {"local": "response"}
 ```
 
 You can also proxy goslow requests directly to your API with extra delay:
 ```shell
-echo 'http://your.api' | curl -d @- 'localhost:5103/goslow/?proxy&delay=10'
+curl -d 'http://your.api' 'localhost:5103/goslow/?proxy&delay=10'
 ```
 
 
@@ -141,20 +144,15 @@ time curl localhost:5103/some/url
 
 By default goslow stores data in memory. This means that any
 configuration change you make will be lost after restart.
-You need to pass
-*--driver* and *--data-source* options to use a RDBMS storage.
+You need to specify *--driver* and *--data-source* options to use a persistend storage.
 
 Goslow supports sqlite3:
 ```shell
 sqlite3 /path/to/sqlite3/db/file < goslow/sql/schema.sql
 bin/goslow --driver sqlite3 --data-source /path/to/sqlite3/db/file
 ```
-... mysql:
-```shell
-mysql -u user dbname < goslow/sql/schema.sql
-bin/goslow --driver mysql --data-source user@host/dbname
-```
-... and postgres:
+
+and postgres:
 ```shell
 psql -U user dbname < goslow/sql/schema.sql
 bin/goslow --driver postgres --data-source postgres://user@host/dbname
