@@ -6,19 +6,19 @@ import (
 )
 
 type Config struct {
-	address             string
-	deployedOn          string
+	listenOn            string
+	endpoint            string
 	driver              string
 	dataSource          string
 	minSiteLength       int
 	siteSalt            string
 	createDefaultRules  bool
-	singleDomainUrlPath string
+	singleDomainUrlPath string // TODO: bad name
 }
 
 var DEFAULT_CONFIG *Config = &Config{
-	address:             ":5103",
-	deployedOn:          "localhost:5103",
+	listenOn:            ":5103",
+	endpoint:            "localhost:5103",
 	driver:              "sqlite3",
 	dataSource:          ":memory:",
 	minSiteLength:       6,
@@ -31,27 +31,26 @@ func NewConfigFromArgs() *Config {
 	config := new(Config)
 	config.defineFlags()
 	flag.Parse()
-	config.checkFlags()
+	config.validate()
 	return config
 }
 
 func (config *Config) defineFlags() {
-	flag.StringVar(&config.address, "address", DEFAULT_CONFIG.address, "address to listen on. E.g: 0.0.0.0:8000")
-	flag.StringVar(&config.deployedOn, "deployed-on", DEFAULT_CONFIG.deployedOn, `address on which goslow is deployed.
-	Used in help texts. E.g: localhost:5103`)
-	flag.StringVar(&config.driver, "driver", DEFAULT_CONFIG.driver, `database driver. One of: memory, sqlite3, mysql, or postgres.
-	Default is memory`)
+	flag.StringVar(&config.listenOn, "listen-on", DEFAULT_CONFIG.listenOn, "address to listen on. E.g: 0.0.0.0:8000")
+	flag.StringVar(&config.endpoint, "endpoint", DEFAULT_CONFIG.endpoint, `url on which goslow is visible to the world.
+	Used only in help texts, doesn't affect listen-on address. E.g: localhost:5103`)
+	flag.StringVar(&config.driver, "driver", DEFAULT_CONFIG.driver, "database driver. Possible values: sqlite3, postgres")
 	flag.StringVar(&config.dataSource, "data-source", DEFAULT_CONFIG.dataSource,
-		"data source name. E.g: postgres://user:password@localhost/dbname")
+		"data source name. E.g: postgres://user:password@localhost/dbname or /path/to/sqlite/db")
 	flag.IntVar(&config.minSiteLength, "min-site-length", DEFAULT_CONFIG.minSiteLength,
 		"minimum length of the randomly generated site names. E.g: 8")
-	flag.StringVar(&config.siteSalt, "site-salt", DEFAULT_CONFIG.siteSalt, "random names salt. E.g: kj8ioIxZ")
+	flag.StringVar(&config.siteSalt, "site-salt", DEFAULT_CONFIG.siteSalt, "random names salt. Keep it secret. E.g: kj8ioIxZ")
 	flag.BoolVar(&config.createDefaultRules, "create-default-rules", DEFAULT_CONFIG.createDefaultRules, "Create default rules?")
 	flag.StringVar(&config.singleDomainUrlPath, "single-domain-url-path", DEFAULT_CONFIG.singleDomainUrlPath,
-		"run in single domain mode, use localhost/goslow for configuration")
+		"If not empty string: run in single domain mode, use [LISTEN_ON]/[SINGLE_DOMAIN_URL_PATH] for configuration")
 }
 
-func (config *Config) checkFlags() {
+func (config *Config) validate() {
 	if config.createDefaultRules && config.singleDomainUrlPath != "" {
 		log.Fatal("You can't use both --single-domain-url-path and --create-default-rules options")
 	}

@@ -74,7 +74,7 @@ func runRuleCreationTestCase(t *testing.T, testCase TestCase) {
 
 func newSubDomainServer(createDefaultRules bool, singleDomainUrlPath string) *httptest.Server {
 	config := *DEFAULT_CONFIG
-	config.deployedOn = HOST
+	config.endpoint = HOST
 	config.createDefaultRules = createDefaultRules
 	config.singleDomainUrlPath = singleDomainUrlPath
 	handler := NewServer(&config)

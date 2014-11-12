@@ -133,7 +133,7 @@ func (server *Server) handleCreateSite(w http.ResponseWriter, req *http.Request)
 		return
 	}
 	if req.FormValue("output") == "short" {
-		fmt.Fprintf(w, "%s.%s", rule.Site, server.config.deployedOn)
+		fmt.Fprintf(w, "%s.%s", rule.Site, server.config.endpoint)
 		return
 	}
 	CREATE_SITE_TEMPLATE.Execute(w, server.makeTemplateData(rule))
@@ -225,9 +225,9 @@ func (server *Server) handleError(err error, w http.ResponseWriter) {
 func (server *Server) makeTemplateData(rule *Rule) *TemplateData {
 	var domain string
 	if server.isInSingleSiteMode() {
-		domain = server.config.deployedOn
+		domain = server.config.endpoint
 	} else {
-		domain = fmt.Sprintf("%s.%s", rule.Site, server.config.deployedOn)
+		domain = fmt.Sprintf("%s.%s", rule.Site, server.config.endpoint)
 	}
 	return &TemplateData{Rule: rule, Domain: domain}
 }
@@ -343,6 +343,6 @@ func (server *Server) headersForStatus(status int) map[string]string {
 }
 
 func (server *Server) ListenAndServe() error {
-	log.Printf("listening on %s", server.config.address)
-	return http.ListenAndServe(server.config.address, server)
+	log.Printf("listening on %s", server.config.listenOn)
+	return http.ListenAndServe(server.config.listenOn, server)
 }
