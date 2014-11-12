@@ -73,8 +73,8 @@ func makeRule(rows *sql.Rows) (*Rule, error) {
 	rule := new(Rule)
 	var headersJson string
 	var delay int64
-	err := rows.Scan(&rule.Site, &rule.Path, &rule.Method, &headersJson, &delay, &rule.ResponseStatus,
-		&rule.ResponseBody)
+	err := rows.Scan(&rule.Site, &rule.Path, &rule.Method, &headersJson, &delay, &rule.StatusCode,
+		&rule.Body)
 	if err != nil {
 		return rule, err
 	}
@@ -120,7 +120,7 @@ func (storage *Storage) UpsertRule(rule *Rule) error {
 		return err
 	}
 	_, err = tx.Exec(storage.dialectify(CREATE_RULE_SQL), rule.Site, rule.Path, rule.Method,
-		headersJson, int64(rule.Delay), rule.ResponseStatus, rule.ResponseBody)
+		headersJson, int64(rule.Delay), rule.StatusCode, rule.Body)
 	if err != nil {
 		return err
 	}

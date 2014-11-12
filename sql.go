@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS rules (
   delay BIGINT, response_status INT, response_body TEXT,
   PRIMARY KEY(site, path, method),
   FOREIGN KEY(site) REFERENCES sites(site)
+  -- TODO: check that foreign key works on postgres
 );
 `
 

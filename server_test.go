@@ -46,6 +46,8 @@ func TestRuleCreation(t *testing.T) {
 	runRuleCreationTestCase(t, TestCase{true, ""})
 	runRuleCreationTestCase(t, TestCase{false, "/goslow"})
 	runRuleCreationTestCase(t, TestCase{false, "/goslow/"})
+	runRuleCreationTestCase(t, TestCase{false, "/te"})
+	runRuleCreationTestCase(t, TestCase{false, "/te/"})
 	runRuleCreationTestCase(t, TestCase{false, "/composite/path"})
 }
 
@@ -58,14 +60,14 @@ func runRuleCreationTestCase(t *testing.T, testCase TestCase) {
 	if prefix == "" {
 		site = newSite(server, join(prefix, "/"), "haha")
 	} else {
-		addRule(t, server, &Rule{Path: join(prefix, "/"), ResponseBody: "haha"})
+		addRule(t, server, &Rule{Path: join(prefix, "/"), Body: "haha"})
 	}
 	shouldBeEqual(t, readBody(GET(server.URL, "/", site)), "haha")
-	addRule(t, server, &Rule{Site: site, Path: join(prefix, "/test"), ResponseBody: "hop", Method: "GET"})
+	addRule(t, server, &Rule{Site: site, Path: join(prefix, "/test"), Body: "hop", Method: "GET"})
 	shouldBeEqual(t, readBody(GET(server.URL, "/test", site)), "hop")
 	resp := POST(server.URL, "/test", site, "")
 	intShouldBeEqual(t, 404, resp.StatusCode)
-	addRule(t, server, &Rule{Site: site, Path: join(prefix, "/test"), ResponseBody: "for POST", Method: "POST",
+	addRule(t, server, &Rule{Site: site, Path: join(prefix, "/test"), Body: "for POST", Method: "POST",
 		Delay: time.Duration(100) * time.Millisecond})
 	shouldBeEqual(t, readBody(GET(server.URL, "/test", site)), "hop")
 	shouldBeEqual(t, readBody(POST(server.URL, "/test", site, "")), "for POST")
@@ -170,7 +172,7 @@ func addRule(t *testing.T, server *httptest.Server, rule *Rule) {
 	path += "?method=" + rule.Method
 	path += fmt.Sprintf("&delay=%f", rule.Delay.Seconds())
 	resp := POST(server.URL, path, makeHost("admin-"+rule.Site, HOST),
-		rule.ResponseBody)
+		rule.Body)
 	intShouldBeEqual(t, 200, resp.StatusCode)
 }
 

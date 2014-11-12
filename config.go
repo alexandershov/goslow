@@ -13,7 +13,7 @@ type Config struct {
 	minSiteLength       int
 	siteSalt            string
 	createDefaultRules  bool
-	singleDomainUrlPath string // TODO: bad name
+	singleDomainUrlPath string // TODO: fix bad name
 }
 
 var DEFAULT_CONFIG *Config = &Config{

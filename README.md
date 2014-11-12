@@ -12,7 +12,7 @@ and you're set:
 
 ```shell
 time curl 10.goslow.link/me
-{"goslow": "link"}
+{"goslow": "response"}
 10.023 total
 ```
 
@@ -22,7 +22,7 @@ We'll get to that later.
 By the way, different endpoints and POST requests also work:
 ```shell
 time curl -X POST -d 'your payload' '10.goslow.link/me/feed?message="test"'
-{"goslow": "link"}
+{"goslow": "response"}
 10.123 total
 ```
 
@@ -31,7 +31,7 @@ Need to simulate a 6 seconds delay? Just use *6.goslow.link* instead of *10.gosl
 
 ```shell
 time curl 6.goslow.link/me
-{"goslow": "link"}
+{"goslow": "response"}
 6.128 total
 ```
 

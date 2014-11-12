@@ -9,43 +9,30 @@ import (
 	"log"
 	"net/http"
 	"net/url"
-	"regexp"
 	"strconv"
 	"strings"
-	"text/template"
 	"time"
 )
 
-const DEFAULT_RESPONSE = `{"default": "response"}`
+const DEFAULT_RESPONSE = `{"goslow": "response"}`
 const MAX_DELAY = 99
-const MIN_STATUS = 100
-const MAX_STATUS = 599
+const MIN_STATUS_CODE = 100
+const MAX_STATUS_CODE = 599
 
 const CREATE_SUBDOMAIN_NAME = "create"
-const ADD_RULE_PREFIX = "admin-"
+const ADD_RULE_SUBDOMAIN_PREFIX = "admin-"
 const BUG_REPORTS_EMAIL = "codumentary.com@gmail.com"
 
 var REDIRECT_STATUSES = map[int]bool{301: true, 302: true}
 var EMPTY_HEADERS = map[string]string{}
 
-var CREATE_SITE_TEMPLATE = template.Must(template.New("create site").Parse(
-	`Site {{ .Domain }} was created successfully.
-
-Use admin-{{ .Domain }} for configuration.
-`))
-
-var ADD_RULE_TEMPLATE = template.Must(template.New("add rule").Parse(
-	`{{ .Domain }}{{ .Path }} now responds with {{ .ResponseBody }}.
-`))
-
 const MAX_GENERATE_SITE_NAME_ATTEMPTS = 5
 const DURATION_BETWEEN_GENERATE_SITE_NAME_ATTEMPTS = time.Duration(10) * time.Millisecond
 
 type Server struct {
-	config     *Config
-	storage    *Storage
-	hasher     *hashids.HashID
-	pathRegexp *regexp.Regexp
+	config  *Config
+	storage *Storage
+	hasher  *hashids.HashID
 }
 
 type TemplateData struct {
@@ -60,8 +47,7 @@ func NewServer(config *Config) *Server {
 	}
 
 	server := &Server{config: config, storage: storage,
-		hasher:     newHasher(config.siteSalt, config.minSiteLength),
-		pathRegexp: regexp.MustCompile(fmt.Sprintf("%s(?:\\b.*|$)", config.singleDomainUrlPath)),
+		hasher: newHasher(config.siteSalt, config.minSiteLength),
 	}
 	if config.createDefaultRules {
 		server.createDefaultRules()
@@ -200,9 +186,9 @@ func (server *Server) makeRule(site string, req *http.Request) (*Rule, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Rule{Site: site, ResponseStatus: http.StatusOK, Headers: EMPTY_HEADERS,
+	return &Rule{Site: site, StatusCode: http.StatusOK, Headers: EMPTY_HEADERS,
 		Path: path, Method: values.Get("method"),
-		ResponseBody: string(body), Delay: delay}, nil
+		Body: string(body), Delay: delay}, nil
 }
 
 func getDelay(values url.Values) (time.Duration, error) {
@@ -251,9 +237,21 @@ func (server *Server) isAddRule(r *http.Request) bool {
 		return false
 	}
 	if server.isInSingleSiteMode() {
-		return server.pathRegexp.MatchString(r.URL.Path)
+		return server.isSpecialPath(r.URL.Path)
 	}
-	return strings.HasPrefix(getSubdomain(r.Host), ADD_RULE_PREFIX)
+	return strings.HasPrefix(getSubdomain(r.Host), ADD_RULE_SUBDOMAIN_PREFIX)
+}
+
+func (server *Server) isSpecialPath(path string) bool {
+	specialPath := server.config.singleDomainUrlPath
+	if !strings.HasPrefix(path, specialPath) {
+		return false
+	}
+	if strings.HasSuffix(specialPath, "/") {
+		return true
+	}
+	suffix := strings.TrimPrefix(path, specialPath)
+	return suffix == "" || suffix[0] == '?' || suffix[0] == '/'
 }
 
 func (server *Server) handleAddRule(w http.ResponseWriter, req *http.Request) {
@@ -271,7 +269,7 @@ func (server *Server) getSite(req *http.Request) string {
 	}
 	subdomain := getSubdomain(req.Host)
 	if server.isAddRule(req) {
-		return strings.TrimPrefix(subdomain, ADD_RULE_PREFIX)
+		return strings.TrimPrefix(subdomain, ADD_RULE_SUBDOMAIN_PREFIX)
 	}
 	return subdomain
 }
@@ -295,8 +293,8 @@ func ApplyRule(rule *Rule, w http.ResponseWriter) {
 	time.Sleep(rule.Delay)
 
 	addHeaders(rule.Headers, w)
-	w.WriteHeader(rule.ResponseStatus)
-	io.WriteString(w, rule.ResponseBody)
+	w.WriteHeader(rule.StatusCode)
+	io.WriteString(w, rule.Body)
 }
 
 func addHeaders(headers map[string]string, w http.ResponseWriter) {
@@ -317,17 +315,17 @@ func (server *Server) createDelayRules() {
 		delay := time.Duration(i) * time.Second
 
 		server.storage.UpsertRule(&Rule{Site: delaySite, Headers: EMPTY_HEADERS, Delay: delay,
-			ResponseStatus: http.StatusOK, ResponseBody: DEFAULT_RESPONSE,
+			StatusCode: http.StatusOK, Body: DEFAULT_RESPONSE,
 		})
 	}
 }
 
 func (server *Server) createStatusRules() {
-	for i := MIN_STATUS; i <= MAX_STATUS; i++ {
+	for i := MIN_STATUS_CODE; i <= MAX_STATUS_CODE; i++ {
 		statusSite := strconv.Itoa(i)
 		headers := server.headersForStatus(i)
-		server.storage.UpsertRule(&Rule{Site: statusSite, ResponseStatus: i,
-			Headers: headers, ResponseBody: DEFAULT_RESPONSE})
+		server.storage.UpsertRule(&Rule{Site: statusSite, StatusCode: i,
+			Headers: headers, Body: DEFAULT_RESPONSE})
 	}
 }
 

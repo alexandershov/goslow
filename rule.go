@@ -6,13 +6,13 @@ import (
 )
 
 type Rule struct {
-	Site           string
-	Path           string
-	Method         string
-	Headers        map[string]string
-	Delay          time.Duration
-	ResponseStatus int
-	ResponseBody   string
+	Site       string
+	Path       string
+	Method     string
+	Headers    map[string]string
+	Delay      time.Duration
+	StatusCode int
+	Body       string
 }
 
 func (rule *Rule) Matches(req *http.Request) bool {
