@@ -12,51 +12,8 @@ import (
 	"time"
 )
 
+// Matches $1, $2, $3, ...
 var POSTGRES_PLACEHOLDERS *regexp.Regexp = regexp.MustCompile("\\$\\d+")
-
-const CREATE_SCHEMA_SQL = `
-CREATE TABLE IF NOT EXISTS sites(
-  site TEXT PRIMARY KEY
-);
-
-CREATE TABLE IF NOT EXISTS rules (
-  site TEXT, path TEXT, method TEXT, headers TEXT,
-  delay BIGINT, response_status INT, response_body TEXT,
-  PRIMARY KEY(site, path, method),
-  FOREIGN KEY(site) REFERENCES sites(site)
-);
-
-`
-
-const DELETE_RULE_SQL = `
-DELETE FROM rules
-WHERE site = $1 AND path = $2 AND method = $3
-`
-
-const CREATE_RULE_SQL = `
-INSERT INTO rules
-(site, path, method, headers, delay, response_status, response_body)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
-`
-
-const GET_SITE_RULES_SQL = `
-SELECT site, path, method, headers, delay, response_status, response_body
-FROM rules
-WHERE site = $1
-ORDER BY LENGTH(path) DESC, LENGTH(method) DESC
-`
-
-const CREATE_SITE_SQL = `
-INSERT INTO sites
-(site)
-VALUES ($1)
-`
-
-const GET_SITE_SQL = `
-SELECT *
-FROM sites
-WHERE site = $1
-`
 
 type Storage struct {
 	driver     string
@@ -70,7 +27,7 @@ func NewStorage(driver string, dataSource string) (*Storage, error) {
 		return nil, err
 	}
 	storage := &Storage{driver: driver, dataSource: dataSource, db: db}
-	_, err = storage.db.Exec(storage.dialectify(CREATE_SCHEMA_SQL))
+	_, err = storage.db.Exec(storage.dialectify(CREATE_SCHEMA_IF_NOT_EXISTS_SQL))
 	return storage, err
 }
 
@@ -102,7 +59,7 @@ func (storage *Storage) getSiteRules(site string) ([]*Rule, error) {
 		}
 		rules = append(rules, rule)
 	}
-	return rules, nil
+	return rules, rows.Err()
 }
 
 func (storage *Storage) dialectify(sql string) string {
@@ -116,15 +73,17 @@ func makeRule(rows *sql.Rows) (*Rule, error) {
 	rule := new(Rule)
 	var headersJson string
 	var delay int64
-	rows.Scan(&rule.Site, &rule.Path, &rule.Method, &headersJson, &delay, &rule.ResponseStatus,
+	err := rows.Scan(&rule.Site, &rule.Path, &rule.Method, &headersJson, &delay, &rule.ResponseStatus,
 		&rule.ResponseBody)
+	if err != nil {
+		return rule, err
+	}
 	rule.Delay = time.Duration(delay)
-	var err error
-	rule.Headers, err = jsonToMap(headersJson)
+	rule.Headers, err = jsonToStringMap(headersJson)
 	return rule, err
 }
 
-func jsonToMap(js string) (map[string]string, error) {
+func jsonToStringMap(js string) (map[string]string, error) {
 	object := make(map[string]interface{})
 	err := json.Unmarshal([]byte(js), &object)
 	if err != nil {
@@ -156,17 +115,21 @@ func (storage *Storage) UpsertRule(rule *Rule) error {
 	if err != nil {
 		return err
 	}
+	headersJson, err := stringMapToJson(rule.Headers)
+	if err != nil {
+		return err
+	}
 	_, err = tx.Exec(storage.dialectify(CREATE_RULE_SQL), rule.Site, rule.Path, rule.Method,
-		stringMapToJson(rule.Headers), rule.Delay, rule.ResponseStatus, rule.ResponseBody)
+		headersJson, int64(rule.Delay), rule.ResponseStatus, rule.ResponseBody)
 	if err != nil {
 		return err
 	}
 	return tx.Commit()
 }
 
-func stringMapToJson(m map[string]string) string {
-	b, _ := json.Marshal(m)
-	return string(b)
+func stringMapToJson(m map[string]string) (string, error) {
+	b, err := json.Marshal(m)
+	return string(b), err
 }
 
 func (storage *Storage) CreateSite(site string) error {
@@ -180,5 +143,6 @@ func (storage *Storage) ContainsSite(site string) (bool, error) {
 		return false, err
 	}
 	defer rows.Close()
-	return rows.Next(), nil
+	containsSite := rows.Next()
+	return containsSite, rows.Err()
 }
