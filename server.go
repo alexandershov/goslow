@@ -29,13 +29,13 @@ var REDIRECT_STATUSES = map[int]bool{301: true, 302: true}
 var EMPTY_HEADERS = map[string]string{}
 
 var CREATE_SITE_TEMPLATE = template.Must(template.New("create site").Parse(
-	`Site {{.Site }} was created successfully.
+	`Site {{ .Domain }} was created successfully.
 
-Use admin-{{.Site }} subdomain for configuration.
+Use admin-{{ .Domain }} for configuration.
 `))
 
 var ADD_RULE_TEMPLATE = template.Must(template.New("add rule").Parse(
-	`Path {{.Path }} now responds with {{ .ResponseBody }}.
+	`{{ .Domain }}{{ .Path }} now responds with {{ .ResponseBody }}.
 `))
 
 const MAX_GENERATE_SITE_NAME_ATTEMPTS = 5
@@ -46,6 +46,11 @@ type Server struct {
 	storage    *Storage
 	hasher     *hashids.HashID
 	pathRegexp *regexp.Regexp
+}
+
+type TemplateData struct {
+	*Rule
+	Domain string
 }
 
 func NewServer(config *Config) *Server {
@@ -131,9 +136,9 @@ func (server *Server) handleCreateSite(w http.ResponseWriter, req *http.Request)
 		fmt.Fprintf(w, "%s.%s", rule.Site, server.config.deployedOn)
 		return
 	}
-	CREATE_SITE_TEMPLATE.Execute(w, rule)
+	CREATE_SITE_TEMPLATE.Execute(w, server.makeTemplateData(rule))
 	io.WriteString(w, "\n")
-	ADD_RULE_TEMPLATE.Execute(w, rule)
+	ADD_RULE_TEMPLATE.Execute(w, server.makeTemplateData(rule))
 }
 
 func (server *Server) createSite(req *http.Request) (*Rule, error) {
@@ -217,6 +222,16 @@ func (server *Server) handleError(err error, w http.ResponseWriter) {
 	http.Error(w, fmt.Sprintf("Internal error: %s. For real", err), http.StatusInternalServerError)
 }
 
+func (server *Server) makeTemplateData(rule *Rule) *TemplateData {
+	var domain string
+	if server.isInSingleSiteMode() {
+		domain = server.config.deployedOn
+	} else {
+		domain = fmt.Sprintf("%s.%s", rule.Site, server.config.deployedOn)
+	}
+	return &TemplateData{Rule: rule, Domain: domain}
+}
+
 func (server *Server) respondFromRule(w http.ResponseWriter, req *http.Request) {
 	rule, found, err := server.storage.FindRuleMatching(server.getSite(req), req)
 	if err != nil {
@@ -247,7 +262,7 @@ func (server *Server) handleAddRule(w http.ResponseWriter, req *http.Request) {
 		server.handleError(err, w)
 		return
 	}
-	ADD_RULE_TEMPLATE.Execute(w, rule)
+	ADD_RULE_TEMPLATE.Execute(w, server.makeTemplateData(rule))
 }
 
 func (server *Server) getSite(req *http.Request) string {
