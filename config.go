@@ -7,6 +7,7 @@ import (
 
 type Config struct {
 	address             string
+	deployedOn          string
 	driver              string
 	dataSource          string
 	minSiteLength       int
@@ -17,6 +18,7 @@ type Config struct {
 
 var DEFAULT_CONFIG *Config = &Config{
 	address:             ":5103",
+	deployedOn:          "localhost:5103",
 	driver:              "sqlite3",
 	dataSource:          ":memory:",
 	minSiteLength:       6,
@@ -35,6 +37,8 @@ func NewConfigFromArgs() *Config {
 
 func (config *Config) defineFlags() {
 	flag.StringVar(&config.address, "address", DEFAULT_CONFIG.address, "address to listen on. E.g: 0.0.0.0:8000")
+	flag.StringVar(&config.deployedOn, "deployed-on", DEFAULT_CONFIG.deployedOn, `address on which goslow is deployed.
+	Used in help texts. E.g: localhost:5103`)
 	flag.StringVar(&config.driver, "driver", DEFAULT_CONFIG.driver, `database driver. One of: memory, sqlite3, mysql, or postgres.
 	Default is memory`)
 	flag.StringVar(&config.dataSource, "data-source", DEFAULT_CONFIG.dataSource,

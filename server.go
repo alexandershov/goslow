@@ -128,7 +128,7 @@ func (server *Server) handleCreateSite(w http.ResponseWriter, req *http.Request)
 		return
 	}
 	if req.FormValue("output") == "short" {
-		fmt.Fprintf(w, rule.Site)
+		fmt.Fprintf(w, "%s.%s", rule.Site, server.config.deployedOn)
 		return
 	}
 	CREATE_SITE_TEMPLATE.Execute(w, rule)

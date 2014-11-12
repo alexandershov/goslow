@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-const HOST = "goslow.link"
+const HOST = "localhost:9999"
 
 type TestCase struct {
 	createDefaultRules  bool
@@ -23,21 +23,21 @@ type TestCase struct {
 func TestZeroSite(t *testing.T) {
 	server := newSubDomainServer(true, "")
 	defer server.Close()
-	shouldBeEqual(t, readBody(GET(server.URL, "/", makeHost("0"))), DEFAULT_RESPONSE)
+	shouldBeEqual(t, readBody(GET(server.URL, "/", makeHost("0", HOST))), DEFAULT_RESPONSE)
 }
 
 func TestDelay(t *testing.T) {
 	server := newSubDomainServer(true, "")
 	defer server.Close()
-	shouldRespondIn(t, createGET(server.URL, "/", makeHost("0")), 0, 0.1)
-	shouldRespondIn(t, createGET(server.URL, "/", makeHost("1")), 1, 1.1)
+	shouldRespondIn(t, createGET(server.URL, "/", makeHost("0", HOST)), 0, 0.1)
+	shouldRespondIn(t, createGET(server.URL, "/", makeHost("1", HOST)), 1, 1.1)
 }
 
 func TestStatus(t *testing.T) {
 	server := newSubDomainServer(true, "")
 	defer server.Close()
 	for _, statusCode := range []int{200, 404, 500} {
-		resp := GET(server.URL, "/", makeHost(strconv.Itoa(statusCode)))
+		resp := GET(server.URL, "/", makeHost(strconv.Itoa(statusCode), HOST))
 		intShouldBeEqual(t, statusCode, resp.StatusCode)
 	}
 }
@@ -60,20 +60,21 @@ func runRuleCreationTestCase(t *testing.T, testCase TestCase) {
 	} else {
 		addRule(t, server, &Rule{Path: join(prefix, "/"), ResponseBody: "haha"})
 	}
-	shouldBeEqual(t, readBody(GET(server.URL, "/", makeHost(site))), "haha")
+	shouldBeEqual(t, readBody(GET(server.URL, "/", site)), "haha")
 	addRule(t, server, &Rule{Site: site, Path: join(prefix, "/test"), ResponseBody: "hop", Method: "GET"})
-	shouldBeEqual(t, readBody(GET(server.URL, "/test", makeHost(site))), "hop")
-	resp := POST(server.URL, "/test", makeHost(site), "")
+	shouldBeEqual(t, readBody(GET(server.URL, "/test", site)), "hop")
+	resp := POST(server.URL, "/test", site, "")
 	intShouldBeEqual(t, 404, resp.StatusCode)
 	addRule(t, server, &Rule{Site: site, Path: join(prefix, "/test"), ResponseBody: "for POST", Method: "POST",
 		Delay: time.Duration(100) * time.Millisecond})
-	shouldBeEqual(t, readBody(GET(server.URL, "/test", makeHost(site))), "hop")
-	shouldBeEqual(t, readBody(POST(server.URL, "/test", makeHost(site), "")), "for POST")
-	shouldRespondIn(t, createPOST(server.URL, "/test", makeHost(site), ""), 0.1, 0.15)
+	shouldBeEqual(t, readBody(GET(server.URL, "/test", site)), "hop")
+	shouldBeEqual(t, readBody(POST(server.URL, "/test", site, "")), "for POST")
+	shouldRespondIn(t, createPOST(server.URL, "/test", site, ""), 0.1, 0.15)
 }
 
 func newSubDomainServer(createDefaultRules bool, singleDomainUrlPath string) *httptest.Server {
 	config := *DEFAULT_CONFIG
+	config.deployedOn = HOST
 	config.createDefaultRules = createDefaultRules
 	config.singleDomainUrlPath = singleDomainUrlPath
 	handler := NewServer(&config)
@@ -110,8 +111,8 @@ func readBody(resp *http.Response) string {
 	return string(body)
 }
 
-func makeHost(subdomain string) string {
-	return fmt.Sprintf("%s.%s", subdomain, HOST)
+func makeHost(subdomain, host string) string {
+	return fmt.Sprintf("%s.%s", subdomain, host)
 }
 
 func shouldBeEqual(t *testing.T, expected, actual string) {
@@ -144,7 +145,8 @@ func toDuration(seconds float64) time.Duration {
 }
 
 func newSite(server *httptest.Server, path, response string) string {
-	resp := POST(server.URL, fmt.Sprintf("%s?output=short&method=GET", path), makeHost("create"), response)
+	resp := POST(server.URL, fmt.Sprintf("%s?output=short&method=GET", path),
+		makeHost("create", HOST), response)
 	return readBody(resp)
 }
 
@@ -167,7 +169,7 @@ func addRule(t *testing.T, server *httptest.Server, rule *Rule) {
 	path := rule.Path
 	path += "?method=" + rule.Method
 	path += fmt.Sprintf("&delay=%f", rule.Delay.Seconds())
-	resp := POST(server.URL, path, makeHost("admin-"+rule.Site),
+	resp := POST(server.URL, path, makeHost("admin-"+rule.Site, HOST),
 		rule.ResponseBody)
 	intShouldBeEqual(t, 200, resp.StatusCode)
 }
