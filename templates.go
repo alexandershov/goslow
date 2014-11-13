@@ -6,7 +6,7 @@ import (
 
 var (
 	CREATE_SITE_TEMPLATE = template.Must(template.New("create site").Parse(
-		`Site {{ .Domain }} was created successfully.
+		`{{ .Domain }} was created successfully.
 
 Use admin-{{ .Domain }} for configuration.
 `))
