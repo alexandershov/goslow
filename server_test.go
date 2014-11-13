@@ -42,14 +42,6 @@ func TestStatus(t *testing.T) {
 	}
 }
 
-func TestRedirect(t *testing.T) {
-	server := newSubDomainServer(true, "")
-	defer server.Close()
-	for _, statusCode := range []int{301, 302} {
-		resp := GET(server.URL, "/", makeHost(strconv.Itoa(statusCode), HOST))
-		intShouldBeEqual(t, http.StatusOK, resp.StatusCode)
-	}
-}
 
 func TestRuleCreation(t *testing.T) {
 	runRuleCreationTestCase(t, TestCase{true, ""})
