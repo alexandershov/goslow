@@ -1,5 +1,8 @@
 package main
 
+// TODO: think about using panic/recover for most errors
+// TODO: think about replacing isInSingleSiteMode with subclass
+
 import (
 	"errors"
 	"fmt"
@@ -18,6 +21,7 @@ const DEFAULT_RESPONSE = `{"goslow": "response"}`
 const MAX_DELAY = 99
 const MIN_STATUS_CODE = 100
 const MAX_STATUS_CODE = 599
+const ZERO_DELAY_SITE = "0"
 
 const CREATE_SUBDOMAIN_NAME = "create"
 const ADD_RULE_SUBDOMAIN_PREFIX = "admin-"
@@ -25,6 +29,11 @@ const BUG_REPORTS_EMAIL = "codumentary.com@gmail.com"
 
 var REDIRECT_STATUSES = map[int]bool{301: true, 302: true}
 var EMPTY_HEADERS = map[string]string{}
+
+const (
+	DELAY_PARAM       = "delay"
+	STATUS_CODE_PARAM = "status"
+)
 
 const MAX_GENERATE_SITE_NAME_ATTEMPTS = 5
 const DURATION_BETWEEN_GENERATE_SITE_NAME_ATTEMPTS = time.Duration(10) * time.Millisecond
@@ -65,19 +74,23 @@ func newHasher(salt string, minLength int) *hashids.HashID {
 
 func (server *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	log.Printf("%s %s", req.Method, req.URL.Path)
+	var err error = nil
 	switch {
 	case server.isOptions(req):
 		allowCrossDomainRequests(w, req)
 
 	case server.isCreateSite(req):
-		server.handleCreateSite(w, req)
+		err = server.handleCreateSite(w, req)
 
 	case server.isAddRule(req):
-		server.handleAddRule(w, req)
+		err = server.handleAddRule(w, req)
 
 	default:
 		allowCrossDomainRequests(w, req)
-		server.respondFromRule(w, req)
+		err = server.respondFromRule(w, req)
+	}
+	if err != nil {
+		server.handleError(err, w)
 	}
 }
 
@@ -112,32 +125,28 @@ func getSubdomain(url string) string {
 	return strings.Split(url, ".")[0]
 }
 
-func (server *Server) handleCreateSite(w http.ResponseWriter, req *http.Request) {
-	rule, err := server.createSite(req)
-	if err != nil {
-		server.handleError(err, w)
-		return
-	}
-	if req.FormValue("output") == "short" {
-		fmt.Fprintf(w, "%s.%s", rule.Site, server.config.endpoint)
-		return
-	}
-	CREATE_SITE_TEMPLATE.Execute(w, server.makeTemplateData(rule))
-	io.WriteString(w, "\n")
-	ADD_RULE_TEMPLATE.Execute(w, server.makeTemplateData(rule))
-}
-
-func (server *Server) createSite(req *http.Request) (*Rule, error) {
+func (server *Server) handleCreateSite(w http.ResponseWriter, req *http.Request) error {
 	site, err := server.generateUniqueSiteName(MAX_GENERATE_SITE_NAME_ATTEMPTS)
 	if err != nil {
-		return nil, err
+		return err
 	}
+	// TODO: think about add/create naming dualism
 	rule, err := server.addRule(site, req)
-	return rule, err
+	if err != nil {
+		return err
+	}
+	if isShortOutput(req) {
+		fmt.Fprint(w, server.makeFullDomain(rule.Site))
+	} else {
+		CREATE_SITE_TEMPLATE.Execute(w, server.makeTemplateData(rule))
+		io.WriteString(w, "\n")
+		ADD_RULE_TEMPLATE.Execute(w, server.makeTemplateData(rule))
+	}
+	return nil
 }
 
-func (server *Server) generateUniqueSiteName(maxAttempts uint) (string, error) {
-	for ; maxAttempts > 0; maxAttempts-- {
+func (server *Server) generateUniqueSiteName(numAttempts uint) (string, error) {
+	for ; numAttempts > 0; numAttempts-- {
 		site, err := server.makeSiteNameFrom(generateUniqueNumbers())
 		if err != nil {
 			break
@@ -148,7 +157,7 @@ func (server *Server) generateUniqueSiteName(maxAttempts uint) (string, error) {
 		}
 		time.Sleep(DURATION_BETWEEN_GENERATE_SITE_NAME_ATTEMPTS)
 	}
-	return "", errors.New(fmt.Sprintf(`Can't create site.
+	return "", errors.New(fmt.Sprintf(`Can't create.
 Try again in a few seconds or contact %s for help`, BUG_REPORTS_EMAIL))
 }
 
@@ -172,6 +181,7 @@ func (server *Server) addRule(site string, req *http.Request) (*Rule, error) {
 }
 
 func (server *Server) makeRule(site string, req *http.Request) (*Rule, error) {
+	// TODO: abort if body exceeds 1Mb or whatever
 	body, err := ioutil.ReadAll(req.Body)
 	if err != nil {
 		return nil, err
@@ -181,26 +191,39 @@ func (server *Server) makeRule(site string, req *http.Request) (*Rule, error) {
 	if err != nil {
 		return nil, err
 	}
-	path := server.getPath(req)
-	delay, err := getDelay(values)
+	path := server.getRulePath(req)
+	delay, err := getRuleDelay(values)
 	if err != nil {
 		return nil, err
 	}
-	return &Rule{Site: site, StatusCode: http.StatusOK, Headers: EMPTY_HEADERS,
+	statusCode, err := getRuleStatusCode(values)
+	if err != nil {
+		return nil, err
+	}
+	rule := &Rule{Site: site, StatusCode: statusCode, Headers: EMPTY_HEADERS,
 		Path: path, Method: values.Get("method"),
-		Body: string(body), Delay: delay}, nil
+		Body: string(body), Delay: delay}
+	return rule, nil
 }
 
-func getDelay(values url.Values) (time.Duration, error) {
-	_, contains := values["delay"]
+func getRuleDelay(values url.Values) (time.Duration, error) {
+	_, contains := values[DELAY_PARAM]
 	if !contains {
 		return time.Duration(0), nil
 	}
-	delayInSeconds, err := strconv.ParseFloat(values.Get("delay"), 64)
+	delayInSeconds, err := strconv.ParseFloat(values.Get(DELAY_PARAM), 64)
 	if err != nil {
 		return time.Duration(0), err
 	}
 	return time.Duration(delayInSeconds*1000) * time.Millisecond, nil
+}
+
+func getRuleStatusCode(values url.Values) (int, error) {
+	_, contains := values[STATUS_CODE_PARAM]
+	if !contains {
+		return http.StatusOK, nil
+	}
+	return strconv.Atoi(values.Get(STATUS_CODE_PARAM))
 }
 
 func (server *Server) handleError(err error, w http.ResponseWriter) {
@@ -208,59 +231,68 @@ func (server *Server) handleError(err error, w http.ResponseWriter) {
 	http.Error(w, fmt.Sprintf("Internal error: %s. For real", err), http.StatusInternalServerError)
 }
 
-func (server *Server) makeTemplateData(rule *Rule) *TemplateData {
-	var domain string
-	if server.isInSingleSiteMode() {
-		domain = server.config.endpoint
-	} else {
-		domain = fmt.Sprintf("%s.%s", rule.Site, server.config.endpoint)
+func isShortOutput(req *http.Request) bool {
+	values, err := url.ParseQuery(req.URL.RawQuery)
+	if err != nil {
+		return false
 	}
-	return &TemplateData{Rule: rule, Domain: domain}
+	return values.Get("output") == "short"
 }
 
-func (server *Server) respondFromRule(w http.ResponseWriter, req *http.Request) {
+func (server *Server) makeTemplateData(rule *Rule) *TemplateData {
+	return &TemplateData{Rule: rule, Domain: server.makeFullDomain(rule.Site)}
+}
+
+func (server *Server) makeFullDomain(site string) string {
+	if server.isInSingleSiteMode() {
+		return server.config.endpoint
+	}
+	return fmt.Sprintf("%s.%s", site, server.config.endpoint)
+}
+
+func (server *Server) respondFromRule(w http.ResponseWriter, req *http.Request) error {
 	rule, found, err := server.storage.FindRuleMatching(server.getSite(req), req)
 	if err != nil {
-		server.handleError(err, w)
-		return
+		return err
 	}
-
 	if found {
-		ApplyRule(rule, w)
+		applyRule(rule, w)
 	} else {
 		http.Error(w, "No rule. For real.", http.StatusNotFound)
 	}
+	return nil
 }
 
-func (server *Server) isAddRule(r *http.Request) bool {
-	if r.Method != "POST" {
+func (server *Server) isAddRule(req *http.Request) bool {
+	if req.Method != "POST" {
 		return false
 	}
 	if server.isInSingleSiteMode() {
-		return server.isSpecialPath(r.URL.Path)
+		return server.isAddRulePath(req.URL.Path)
 	}
-	return strings.HasPrefix(getSubdomain(r.Host), ADD_RULE_SUBDOMAIN_PREFIX)
+	return strings.HasPrefix(getSubdomain(req.Host), ADD_RULE_SUBDOMAIN_PREFIX)
 }
 
-func (server *Server) isSpecialPath(path string) bool {
-	specialPath := server.config.singleDomainUrlPath
-	if !strings.HasPrefix(path, specialPath) {
+// TODO: rewrite
+func (server *Server) isAddRulePath(path string) bool {
+	addRulePath := server.config.singleDomainUrlPath
+	if !strings.HasPrefix(path, addRulePath) {
 		return false
 	}
-	if strings.HasSuffix(specialPath, "/") {
+	if strings.HasSuffix(addRulePath, "/") {
 		return true
 	}
-	suffix := strings.TrimPrefix(path, specialPath)
+	suffix := strings.TrimPrefix(path, addRulePath)
 	return suffix == "" || suffix[0] == '?' || suffix[0] == '/'
 }
 
-func (server *Server) handleAddRule(w http.ResponseWriter, req *http.Request) {
+func (server *Server) handleAddRule(w http.ResponseWriter, req *http.Request) error {
 	rule, err := server.addRule(server.getSite(req), req)
 	if err != nil {
-		server.handleError(err, w)
-		return
+		return err
 	}
 	ADD_RULE_TEMPLATE.Execute(w, server.makeTemplateData(rule))
+	return nil
 }
 
 func (server *Server) getSite(req *http.Request) string {
@@ -274,7 +306,7 @@ func (server *Server) getSite(req *http.Request) string {
 	return subdomain
 }
 
-func (server *Server) getPath(req *http.Request) string {
+func (server *Server) getRulePath(req *http.Request) string {
 	if server.isInSingleSiteMode() {
 		path := strings.TrimPrefix(req.URL.Path, server.config.singleDomainUrlPath)
 		return ensureHasPrefix(path, "/")
@@ -289,7 +321,7 @@ func ensureHasPrefix(s, prefix string) string {
 	return s
 }
 
-func ApplyRule(rule *Rule, w http.ResponseWriter) {
+func applyRule(rule *Rule, w http.ResponseWriter) {
 	time.Sleep(rule.Delay)
 
 	addHeaders(rule.Headers, w)
@@ -334,7 +366,7 @@ func (server *Server) headersForStatus(status int) map[string]string {
 	if isRedirect {
 		// TODO: check that protocol-independent location is legal HTTP
 		// TODO: header should respect current port
-		host := fmt.Sprintf("//0.goslow.link")
+		host := fmt.Sprintf("//%s", server.makeFullDomain(ZERO_DELAY_SITE))
 		return map[string]string{"Location": host}
 	}
 	return EMPTY_HEADERS
