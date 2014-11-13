@@ -15,19 +15,27 @@ import (
 )
 
 const DEFAULT_RESPONSE = `{"goslow": "response"}`
-const MAX_DELAY = 99
-const MIN_STATUS_CODE = 100
-const MAX_STATUS_CODE = 599
 
-const CREATE_SUBDOMAIN_NAME = "create"
-const ADD_RULE_SUBDOMAIN_PREFIX = "admin-"
+const (
+	MAX_DELAY       = 99
+	MIN_STATUS_CODE = 100
+	MAX_STATUS_CODE = 599
+)
+
+const (
+	CREATE_SUBDOMAIN_NAME     = "create"
+	ADD_RULE_SUBDOMAIN_PREFIX = "admin-"
+)
+
 const BUG_REPORTS_EMAIL = "codumentary.com@gmail.com"
 
 var REDIRECT_STATUSES = map[int]bool{301: true, 302: true}
 var EMPTY_HEADERS = map[string]string{}
 
-const MAX_GENERATE_SITE_NAME_ATTEMPTS = 5
-const DURATION_BETWEEN_GENERATE_SITE_NAME_ATTEMPTS = time.Duration(10) * time.Millisecond
+const (
+	MAX_GENERATE_SITE_NAME_ATTEMPTS              = 5
+	DURATION_BETWEEN_GENERATE_SITE_NAME_ATTEMPTS = time.Duration(10) * time.Millisecond
+)
 
 type Server struct {
 	config  *Config
