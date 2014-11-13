@@ -42,7 +42,6 @@ func TestStatus(t *testing.T) {
 	}
 }
 
-
 func TestRuleCreation(t *testing.T) {
 	runRuleCreationTestCase(t, TestCase{true, ""})
 	runRuleCreationTestCase(t, TestCase{false, "/goslow"})

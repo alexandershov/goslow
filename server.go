@@ -46,7 +46,6 @@ const (
 	STATUS_CODE_PARAM = "status"
 )
 
-
 type Server struct {
 	config  *Config
 	storage *Storage
@@ -147,9 +146,11 @@ func (server *Server) handleCreateSite(w http.ResponseWriter, req *http.Request)
 	if isShortOutput(req) {
 		fmt.Fprint(w, server.makeFullDomain(rule.Site))
 	} else {
+		BANNER_TEMPLATE.Execute(w, nil)
+		ADD_RULE_TEMPLATE.Execute(w, server.makeTemplateData(rule))
+		io.WriteString(w, "\n")
 		CREATE_SITE_TEMPLATE.Execute(w, server.makeTemplateData(rule))
 		io.WriteString(w, "\n")
-		ADD_RULE_TEMPLATE.Execute(w, server.makeTemplateData(rule))
 	}
 	return nil
 }
@@ -215,6 +216,8 @@ func (server *Server) makeRule(site string, req *http.Request) (*Rule, error) {
 	return rule, nil
 }
 
+// TODO: return human readable error, not default strconv.ParseFload error
+// look at different places where you can supply good error message
 func getRuleDelay(values url.Values) (time.Duration, error) {
 	_, contains := values[DELAY_PARAM]
 	if !contains {
@@ -249,7 +252,17 @@ func isShortOutput(req *http.Request) bool {
 }
 
 func (server *Server) makeTemplateData(rule *Rule) *TemplateData {
-	return &TemplateData{Rule: rule, Domain: server.makeFullDomain(rule.Site)}
+	copy := *rule
+	copy.Body = truncate(copy.Body, 80)
+	return &TemplateData{Rule: &copy, Domain: server.makeFullDomain(rule.Site)}
+}
+
+func truncate(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	ellipsis := "..."
+	return s[:maxLen-len(ellipsis)] + ellipsis
 }
 
 func (server *Server) makeFullDomain(site string) string {
@@ -300,6 +313,7 @@ func (server *Server) handleAddRule(w http.ResponseWriter, req *http.Request) er
 	if err != nil {
 		return err
 	}
+	BANNER_TEMPLATE.Execute(w, nil)
 	ADD_RULE_TEMPLATE.Execute(w, server.makeTemplateData(rule))
 	return nil
 }
