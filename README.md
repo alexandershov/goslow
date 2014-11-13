@@ -1,10 +1,9 @@
 ## Why?
 There comes a time in life when you need to test how your application handles slow/buggy
-external API responses. Goslow can help you with that (as long as you can easily
-  configure API server domain name).
+external API responses. As long as you can easily configure API server domain name, goslow'll help you.
 
 ## Quick start
-Let's say you're developing an application against the [Facebook graph API](https://developers.facebook.com/docs/graph-api/quickstart/v2.2) and
+Let's say you're developing an application against the Facebook graph API and
 you want to see what happens when endpoint *graph.facebook.com/me* starts to respond in 10 seconds.
 
 Just configure your app to make requests to *10.goslow.link* instead of *graph.facebook.com*
@@ -57,15 +56,19 @@ Internal Server Error
 
 
 ## Not-so-quick start
-If you want to specify JSON responses you want to get, then you need to, ahem, register.
-Registration is a POST request
-to **create.goslow.link**
+Let's return to the Facebook graph API example.
+Let's say you're using the endpoint *graph.facebook.com/me* and you want to:
+1. Slow it down by 5 seconds
+2. Get {"id": 4, "username": "Zuck"} in response.
 
+Just make a POST request to *create.goslow.link/me?delay=5* and you're set.
 ```shell
-curl -d '{"my": "response"}' 'create.goslow.link/users?delay=5'
+curl -d '{"id": 4, "username": "Zuck"}' 'create.goslow.link/me?delay=5'
 Your goslow domain is: dk8kjs.goslow.link
 ...
 ```
+
+Now, what's the deal with the "*your goslow domain dk8kjs.goslow.link*"?
 
 In the real world your goslow domain will be different
 from the *dk8kjs.goslow.link*. (names are randomly generated) For the sake of example let's assume that randomly
