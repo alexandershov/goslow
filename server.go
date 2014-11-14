@@ -10,6 +10,7 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"math/rand"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -38,8 +39,8 @@ var REDIRECT_STATUSES = map[int]bool{301: true, 302: true}
 var EMPTY_HEADERS = map[string]string{}
 
 const (
-	MAX_GENERATE_SITE_NAME_ATTEMPTS              = 5
-	DURATION_BETWEEN_GENERATE_SITE_NAME_ATTEMPTS = time.Duration(10) * time.Millisecond
+	MAX_GENERATE_SITE_NAME_ATTEMPTS = 5
+	GOSLOW_EPOCH_START              = 1415975661 // TODO: update it before launch
 )
 
 const (
@@ -169,7 +170,7 @@ func (server *Server) generateUniqueSiteName(numAttempts uint) (string, error) {
 		if err == nil {
 			return site, nil
 		}
-		time.Sleep(DURATION_BETWEEN_GENERATE_SITE_NAME_ATTEMPTS)
+		time.Sleep(getRandomDuration(10, 20))
 	}
 	return "", errors.New(fmt.Sprintf(`Can't create.
 Try again in a few seconds or contact %s for help`, BUG_REPORTS_EMAIL))
@@ -181,7 +182,7 @@ func (server *Server) makeSiteNameFrom(numbers []int) (string, error) {
 
 func generateUniqueNumbers() []int {
 	utc := time.Now().UTC()
-	seconds := int(utc.Unix()) // TODO: fix me at 2037-12-31
+	seconds := int(utc.Unix()) - GOSLOW_EPOCH_START // TODO: fix me at 2037-12-31
 	milliseconds := (utc.Nanosecond() / 1000000) % 1000
 	return []int{seconds, milliseconds}
 }
@@ -240,6 +241,11 @@ func getRuleStatusCode(values url.Values) (int, error) {
 		return http.StatusOK, nil
 	}
 	return strconv.Atoi(values.Get(STATUS_CODE_PARAM))
+}
+
+func getRandomDuration(minMilliseconds, maxMilliseconds int) time.Duration {
+	milliseconds := minMilliseconds + rand.Intn(maxMilliseconds-minMilliseconds+1)
+	return time.Duration(milliseconds) * time.Millisecond
 }
 
 func (server *Server) handleError(err error, w http.ResponseWriter) {
