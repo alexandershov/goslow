@@ -22,6 +22,6 @@ curl -X POST -d "hohoho" admin-{{ .Domain }}/xmas?delay=3&method=GET
 
 	ADD_RULE_TEMPLATE = template.Must(template.New("add rule").Parse(
 		`Endpoint {{ .Domain }}{{ .Path }} now responds to {{if .Method }}{{ .Method }}{{else}}any HTTP method{{ end }} {{ if .Delay }}with the delay {{ .Delay }}{{ else }}without delay{{end}}. Response is:
-{{ .Body }}
+{{ .StringBody }}
 `))
 )

@@ -1,5 +1,6 @@
 package main
 
+// TODO: solve BYTEA/BLOB problem
 const (
 	CREATE_SCHEMA_IF_NOT_EXISTS_SQL = `
 CREATE TABLE IF NOT EXISTS sites(
@@ -8,7 +9,7 @@ CREATE TABLE IF NOT EXISTS sites(
 
 CREATE TABLE IF NOT EXISTS rules (
   site TEXT, path TEXT, method TEXT, headers TEXT,
-  delay BIGINT, response_status INT, response_body TEXT,
+  delay BIGINT, response_status INT, response_body BYTEA,
   PRIMARY KEY(site, path, method),
   FOREIGN KEY(site) REFERENCES sites(site)
   -- TODO: check that foreign key works on postgres

@@ -18,7 +18,7 @@ import (
 	"time"
 )
 
-const DEFAULT_RESPONSE = `{"goslow": "response"}`
+var DEFAULT_RESPONSE = []byte(`{"goslow": "response"}`)
 
 const (
 	MAX_DELAY       = 99
@@ -26,6 +26,7 @@ const (
 	MAX_STATUS_CODE = 599
 	ZERO_DELAY_SITE = "0"
 	EMPTY_SITE      = ""
+	MAX_BODY_SIZE   = 1024 * 1024
 )
 
 const (
@@ -56,7 +57,8 @@ type Server struct {
 
 type TemplateData struct {
 	*Rule
-	Domain string
+	Domain     string
+	StringBody string
 }
 
 func NewServer(config *Config) *Server {
@@ -196,12 +198,10 @@ func (server *Server) addRule(site string, req *http.Request) (*Rule, error) {
 }
 
 func (server *Server) makeRule(site string, req *http.Request) (*Rule, error) {
-	// TODO: abort if body exceeds 1Mb or whatever
 	body, err := ioutil.ReadAll(req.Body)
 	if err != nil {
 		return nil, err
 	}
-
 	values, err := url.ParseQuery(req.URL.RawQuery)
 	if err != nil {
 		return nil, err
@@ -217,7 +217,7 @@ func (server *Server) makeRule(site string, req *http.Request) (*Rule, error) {
 	}
 	rule := &Rule{Site: site, StatusCode: statusCode, Headers: EMPTY_HEADERS,
 		Path: path, Method: values.Get("method"),
-		Body: string(body), Delay: delay}
+		Body: body, Delay: delay}
 	return rule, nil
 }
 
@@ -262,9 +262,8 @@ func isShortOutput(req *http.Request) bool {
 }
 
 func (server *Server) makeTemplateData(rule *Rule) *TemplateData {
-	copy := *rule
-	copy.Body = truncate(copy.Body, 80)
-	return &TemplateData{Rule: &copy, Domain: server.makeFullDomain(rule.Site)}
+	return &TemplateData{Rule: rule, Domain: server.makeFullDomain(rule.Site),
+		StringBody: truncate(string(rule.Body), 80)}
 }
 
 func truncate(s string, maxLen int) string {
@@ -359,7 +358,7 @@ func applyRule(rule *Rule, w http.ResponseWriter) {
 
 	addHeaders(rule.Headers, w)
 	w.WriteHeader(rule.StatusCode)
-	io.WriteString(w, rule.Body)
+	w.Write(rule.Body)
 }
 
 func addHeaders(headers map[string]string, w http.ResponseWriter) {

@@ -12,7 +12,7 @@ type Rule struct {
 	Headers    map[string]string
 	Delay      time.Duration
 	StatusCode int
-	Body       string
+	Body       []byte
 }
 
 func (rule *Rule) Matches(req *http.Request) bool {
