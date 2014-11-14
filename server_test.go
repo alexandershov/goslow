@@ -37,6 +37,12 @@ func TestZeroSite(t *testing.T) {
 	shouldBeEqual(t, readBody(GET(server.URL, "/", makeHost("0", HOST))), string(DEFAULT_RESPONSE))
 }
 
+func TestRedefineBuiltinSites(t *testing.T) {
+	server, _ := newSubDomainServer(TestCase{createDefaultRules: true, singleDomainUrlPath: ""})
+	defer server.Close()
+	addRule(t, server, &Rule{Site: "0", Path: "/test", Body: []byte("hop"), Method: "GET"}, http.StatusForbidden)
+}
+
 func TestDelay(t *testing.T) {
 	server, _ := newSubDomainServer(TestCase{createDefaultRules: true, singleDomainUrlPath: ""})
 	defer server.Close()
@@ -91,6 +97,9 @@ func TestRuleCreation(t *testing.T) {
 
 func runRuleCreationTestCase(t *testing.T, testCase TestCase) {
 	log.Printf("running test")
+	if testCase.driver == "postgres" && testing.Short() {
+		return
+	}
 	if testCase.driver == "postgres" {
 		createDb(TEST_DB)
 		defer dropDb(TEST_DB)
@@ -103,15 +112,15 @@ func runRuleCreationTestCase(t *testing.T, testCase TestCase) {
 	if prefix == "" {
 		site = newSite(server, join(prefix, "/"), "haha")
 	} else {
-		addRule(t, server, &Rule{Path: join(prefix, "/"), Body: []byte("haha")})
+		addRule(t, server, &Rule{Path: join(prefix, "/"), Body: []byte("haha")}, 200)
 	}
 	shouldBeEqual(t, readBody(GET(server.URL, "/", site)), "haha")
-	addRule(t, server, &Rule{Site: site, Path: join(prefix, "/test"), Body: []byte("hop"), Method: "GET"})
+	addRule(t, server, &Rule{Site: site, Path: join(prefix, "/test"), Body: []byte("hop"), Method: "GET"}, 200)
 	shouldBeEqual(t, readBody(GET(server.URL, "/test", site)), "hop")
 	resp := POST(server.URL, "/test", site, "")
 	intShouldBeEqual(t, 404, resp.StatusCode)
 	addRule(t, server, &Rule{Site: site, Path: join(prefix, "/test"), Body: []byte("for POST"), Method: "POST",
-		Delay: time.Duration(100) * time.Millisecond})
+		Delay: time.Duration(100) * time.Millisecond}, 200)
 	shouldBeEqual(t, readBody(GET(server.URL, "/test", site)), "hop")
 	shouldBeEqual(t, readBody(POST(server.URL, "/test", site, "")), "for POST")
 	shouldRespondIn(t, createPOST(server.URL, "/test", site, ""), 0.1, 0.15)
@@ -123,8 +132,8 @@ func newSubDomainServer(testCase TestCase) (*httptest.Server, *Server) {
 	config.createDefaultRules = testCase.createDefaultRules
 	config.singleDomainUrlPath = testCase.singleDomainUrlPath
 	if testCase.driver != "" {
-	config.driver = testCase.driver
-	config.dataSource = testCase.dataSource
+		config.driver = testCase.driver
+		config.dataSource = testCase.dataSource
 	}
 	handler := NewServer(&config)
 	return httptest.NewServer(handler), handler
@@ -214,13 +223,13 @@ func createPOST(url, path, host, payload string) *http.Request {
 	return req
 }
 
-func addRule(t *testing.T, server *httptest.Server, rule *Rule) {
+func addRule(t *testing.T, server *httptest.Server, rule *Rule, statusCode int) {
 	path := rule.Path
 	path += "?method=" + rule.Method
 	path += fmt.Sprintf("&delay=%f", rule.Delay.Seconds())
 	resp := POST(server.URL, path, makeHost("admin-"+rule.Site, HOST),
 		string(rule.Body))
-	intShouldBeEqual(t, 200, resp.StatusCode)
+	intShouldBeEqual(t, statusCode, resp.StatusCode)
 }
 
 func join(elem ...string) string {

@@ -61,6 +61,19 @@ type TemplateData struct {
 	StringBody string
 }
 
+type ApiError struct {
+	Message    string
+	StatusCode int
+}
+
+func (error *ApiError) Error() string {
+	return error.Message
+}
+
+func NewApiError(message string, statusCode int) *ApiError {
+	return &ApiError{Message: message, StatusCode: statusCode}
+}
+
 func NewServer(config *Config) *Server {
 	storage, err := NewStorage(config.driver, config.dataSource)
 	if err != nil {
@@ -250,7 +263,12 @@ func getRandomDuration(minMilliseconds, maxMilliseconds int) time.Duration {
 
 func (server *Server) handleError(err error, w http.ResponseWriter) {
 	log.Print(err)
-	http.Error(w, fmt.Sprintf("Internal error: %s. For real", err), http.StatusInternalServerError)
+	apiError, isApiError := err.(*ApiError)
+	if isApiError {
+		http.Error(w, apiError.Error(), apiError.StatusCode)
+	} else {
+		http.Error(w, fmt.Sprintf("Internal error: %s. For real", err), http.StatusInternalServerError)
+	}
 }
 
 func isShortOutput(req *http.Request) bool {
@@ -318,7 +336,11 @@ func (server *Server) isAddRulePath(path string) bool {
 }
 
 func (server *Server) handleAddRule(w http.ResponseWriter, req *http.Request) error {
-	rule, err := server.addRule(server.getSite(req), req)
+	site := server.getSite(req)
+	if isBuiltinSite(site) {
+		return NewApiError(fmt.Sprintf("Sorry, you can't change builtin sites"), http.StatusForbidden)
+	}
+	rule, err := server.addRule(site, req)
 	if err != nil {
 		return err
 	}
@@ -336,6 +358,18 @@ func (server *Server) getSite(req *http.Request) string {
 		return strings.TrimPrefix(subdomain, ADD_RULE_SUBDOMAIN_PREFIX)
 	}
 	return subdomain
+}
+
+func isBuiltinSite(site string) bool {
+	return site == CREATE_SUBDOMAIN_NAME || isDefaultRuleSite(site)
+}
+
+func isDefaultRuleSite(site string) bool {
+	i, err := strconv.Atoi(site)
+	if err != nil {
+		return false
+	}
+	return i <= MAX_STATUS_CODE
 }
 
 func (server *Server) getRulePath(req *http.Request) string {
