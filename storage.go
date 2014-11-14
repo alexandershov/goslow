@@ -9,6 +9,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	"net/http"
 	"regexp"
+	"strings"
 	"time"
 )
 
@@ -27,7 +28,7 @@ func NewStorage(driver string, dataSource string) (*Storage, error) {
 		return nil, err
 	}
 	storage := &Storage{driver: driver, dataSource: dataSource, db: db}
-	_, err = storage.db.Exec(storage.dialectify(CREATE_SCHEMA_IF_NOT_EXISTS_SQL))
+	_, err = storage.db.Exec(storage.dialectifySchema(CREATE_SCHEMA_IF_NOT_EXISTS_SQL))
 	return storage, err
 }
 
@@ -67,6 +68,13 @@ func (storage *Storage) dialectify(sql string) string {
 		return sql
 	}
 	return POSTGRES_PLACEHOLDERS.ReplaceAllString(sql, "?")
+}
+
+func (storage *Storage) dialectifySchema(sql string) string {
+	if storage.driver == "postgres" {
+		return sql
+	}
+	return strings.Replace(sql, "BYTEA", "BLOB", -1)
 }
 
 func makeRule(rows *sql.Rows) (*Rule, error) {

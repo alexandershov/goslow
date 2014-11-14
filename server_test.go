@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"net/http/httptest"
+	"os/exec"
 	"path"
 	"strconv"
 	"strings"
@@ -13,28 +14,38 @@ import (
 	"time"
 )
 
-const HOST = "localhost:9999"
+const (
+	HOST    = "localhost:9999"
+	TEST_DB = "goslow_test"
+)
+
+var DATA_SOURCE = map[string]string{
+	"sqlite3":  ":memory:",
+	"postgres": "postgres://localhost/" + TEST_DB,
+}
 
 type TestCase struct {
 	createDefaultRules  bool
 	singleDomainUrlPath string
+	driver              string
+	dataSource          string
 }
 
 func TestZeroSite(t *testing.T) {
-	server := newSubDomainServer(true, "")
+	server, _ := newSubDomainServer(TestCase{createDefaultRules: true, singleDomainUrlPath: ""})
 	defer server.Close()
 	shouldBeEqual(t, readBody(GET(server.URL, "/", makeHost("0", HOST))), string(DEFAULT_RESPONSE))
 }
 
 func TestDelay(t *testing.T) {
-	server := newSubDomainServer(true, "")
+	server, _ := newSubDomainServer(TestCase{createDefaultRules: true, singleDomainUrlPath: ""})
 	defer server.Close()
 	shouldRespondIn(t, createGET(server.URL, "/", makeHost("0", HOST)), 0, 0.1)
 	shouldRespondIn(t, createGET(server.URL, "/", makeHost("1", HOST)), 1, 1.1)
 }
 
 func TestStatus(t *testing.T) {
-	server := newSubDomainServer(true, "")
+	server, _ := newSubDomainServer(TestCase{createDefaultRules: true, singleDomainUrlPath: ""})
 	defer server.Close()
 	for _, statusCode := range []int{200, 404, 500} {
 		resp := GET(server.URL, "/", makeHost(strconv.Itoa(statusCode), HOST))
@@ -43,17 +54,49 @@ func TestStatus(t *testing.T) {
 }
 
 func TestRuleCreation(t *testing.T) {
-	runRuleCreationTestCase(t, TestCase{true, ""})
-	runRuleCreationTestCase(t, TestCase{false, "/goslow"})
-	runRuleCreationTestCase(t, TestCase{false, "/goslow/"})
-	runRuleCreationTestCase(t, TestCase{false, "/te"})
-	runRuleCreationTestCase(t, TestCase{false, "/te/"})
-	runRuleCreationTestCase(t, TestCase{false, "/composite/path"})
+	for _, driver := range []string{"sqlite3", "postgres"} {
+		dataSource := DATA_SOURCE[driver]
+		runRuleCreationTestCase(t, TestCase{createDefaultRules: true,
+			singleDomainUrlPath: "",
+			driver:              driver,
+			dataSource:          dataSource,
+		})
+		runRuleCreationTestCase(t, TestCase{createDefaultRules: false,
+			singleDomainUrlPath: "/goslow",
+			driver:              driver,
+			dataSource:          dataSource,
+		})
+		runRuleCreationTestCase(t, TestCase{createDefaultRules: false,
+			singleDomainUrlPath: "/goslow/",
+			driver:              driver,
+			dataSource:          dataSource,
+		})
+		runRuleCreationTestCase(t, TestCase{createDefaultRules: false,
+			singleDomainUrlPath: "/te",
+			driver:              driver,
+			dataSource:          dataSource,
+		})
+		runRuleCreationTestCase(t, TestCase{createDefaultRules: false,
+			singleDomainUrlPath: "/te/",
+			driver:              driver,
+			dataSource:          dataSource,
+		})
+		runRuleCreationTestCase(t, TestCase{createDefaultRules: false,
+			singleDomainUrlPath: "/composite/path",
+			driver:              driver,
+			dataSource:          dataSource,
+		})
+	}
 }
 
 func runRuleCreationTestCase(t *testing.T, testCase TestCase) {
 	log.Printf("running test")
-	server := newSubDomainServer(testCase.createDefaultRules, testCase.singleDomainUrlPath)
+	if testCase.driver == "postgres" {
+		createDb(TEST_DB)
+		defer dropDb(TEST_DB)
+	}
+	server, goSlowServer := newSubDomainServer(testCase)
+	defer goSlowServer.storage.db.Close()
 	prefix := testCase.singleDomainUrlPath
 	defer server.Close()
 	var site = ""
@@ -74,13 +117,17 @@ func runRuleCreationTestCase(t *testing.T, testCase TestCase) {
 	shouldRespondIn(t, createPOST(server.URL, "/test", site, ""), 0.1, 0.15)
 }
 
-func newSubDomainServer(createDefaultRules bool, singleDomainUrlPath string) *httptest.Server {
+func newSubDomainServer(testCase TestCase) (*httptest.Server, *Server) {
 	config := *DEFAULT_CONFIG
 	config.endpoint = HOST
-	config.createDefaultRules = createDefaultRules
-	config.singleDomainUrlPath = singleDomainUrlPath
+	config.createDefaultRules = testCase.createDefaultRules
+	config.singleDomainUrlPath = testCase.singleDomainUrlPath
+	if testCase.driver != "" {
+	config.driver = testCase.driver
+	config.dataSource = testCase.dataSource
+	}
 	handler := NewServer(&config)
-	return httptest.NewServer(handler)
+	return httptest.NewServer(handler), handler
 }
 
 func GET(url, path, host string) *http.Response {
@@ -183,4 +230,20 @@ func join(elem ...string) string {
 		joined += "/"
 	}
 	return joined
+}
+
+func createDb(name string) {
+	cmd := exec.Command("createdb", name)
+	err := cmd.Run()
+	if err != nil {
+		log.Fatalf("createdb error: %s", err)
+	}
+}
+
+func dropDb(name string) {
+	cmd := exec.Command("dropdb", name)
+	err := cmd.Run()
+	if err != nil {
+		log.Fatalf("dropdb error: %s", err)
+	}
 }
