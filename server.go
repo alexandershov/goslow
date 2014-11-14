@@ -24,6 +24,7 @@ const (
 	MIN_STATUS_CODE = 100
 	MAX_STATUS_CODE = 599
 	ZERO_DELAY_SITE = "0"
+	EMPTY_SITE      = ""
 )
 
 const (
@@ -68,6 +69,9 @@ func NewServer(config *Config) *Server {
 	}
 	if config.createDefaultRules {
 		server.createDefaultRules()
+	}
+	if server.isInSingleSiteMode() {
+		server.ensureEmptySiteExists()
 	}
 	return server
 }
@@ -368,10 +372,16 @@ func (server *Server) createDelayRules() {
 	for i := 0; i <= MAX_DELAY; i++ {
 		delaySite := strconv.Itoa(i)
 		delay := time.Duration(i) * time.Second
-
-		server.storage.UpsertRule(&Rule{Site: delaySite, Headers: EMPTY_HEADERS, Delay: delay,
+		err := server.storage.CreateSite(delaySite)
+		if err != nil {
+			log.Fatal(err)
+		}
+		err = server.storage.UpsertRule(&Rule{Site: delaySite, Headers: EMPTY_HEADERS, Delay: delay,
 			StatusCode: http.StatusOK, Body: DEFAULT_RESPONSE,
 		})
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 }
 
@@ -379,8 +389,28 @@ func (server *Server) createStatusRules() {
 	for i := MIN_STATUS_CODE; i <= MAX_STATUS_CODE; i++ {
 		statusSite := strconv.Itoa(i)
 		headers := server.headersForStatus(i)
-		server.storage.UpsertRule(&Rule{Site: statusSite, StatusCode: i,
+		err := server.storage.CreateSite(statusSite)
+		if err != nil {
+			log.Fatal(err)
+		}
+		err = server.storage.UpsertRule(&Rule{Site: statusSite, StatusCode: i,
 			Headers: headers, Body: DEFAULT_RESPONSE})
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+}
+
+func (server *Server) ensureEmptySiteExists() {
+	contains, err := server.storage.ContainsSite(EMPTY_SITE)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if !contains {
+		err = server.storage.CreateSite(EMPTY_SITE)
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 }
 
