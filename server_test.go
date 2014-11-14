@@ -23,7 +23,7 @@ type TestCase struct {
 func TestZeroSite(t *testing.T) {
 	server := newSubDomainServer(true, "")
 	defer server.Close()
-	shouldBeEqual(t, readBody(GET(server.URL, "/", makeHost("0", HOST))), DEFAULT_RESPONSE)
+	shouldBeEqual(t, readBody(GET(server.URL, "/", makeHost("0", HOST))), string(DEFAULT_RESPONSE))
 }
 
 func TestDelay(t *testing.T) {
@@ -60,14 +60,14 @@ func runRuleCreationTestCase(t *testing.T, testCase TestCase) {
 	if prefix == "" {
 		site = newSite(server, join(prefix, "/"), "haha")
 	} else {
-		addRule(t, server, &Rule{Path: join(prefix, "/"), Body: "haha"})
+		addRule(t, server, &Rule{Path: join(prefix, "/"), Body: []byte("haha")})
 	}
 	shouldBeEqual(t, readBody(GET(server.URL, "/", site)), "haha")
-	addRule(t, server, &Rule{Site: site, Path: join(prefix, "/test"), Body: "hop", Method: "GET"})
+	addRule(t, server, &Rule{Site: site, Path: join(prefix, "/test"), Body: []byte("hop"), Method: "GET"})
 	shouldBeEqual(t, readBody(GET(server.URL, "/test", site)), "hop")
 	resp := POST(server.URL, "/test", site, "")
 	intShouldBeEqual(t, 404, resp.StatusCode)
-	addRule(t, server, &Rule{Site: site, Path: join(prefix, "/test"), Body: "for POST", Method: "POST",
+	addRule(t, server, &Rule{Site: site, Path: join(prefix, "/test"), Body: []byte("for POST"), Method: "POST",
 		Delay: time.Duration(100) * time.Millisecond})
 	shouldBeEqual(t, readBody(GET(server.URL, "/test", site)), "hop")
 	shouldBeEqual(t, readBody(POST(server.URL, "/test", site, "")), "for POST")
@@ -172,7 +172,7 @@ func addRule(t *testing.T, server *httptest.Server, rule *Rule) {
 	path += "?method=" + rule.Method
 	path += fmt.Sprintf("&delay=%f", rule.Delay.Seconds())
 	resp := POST(server.URL, path, makeHost("admin-"+rule.Site, HOST),
-		rule.Body)
+		string(rule.Body))
 	intShouldBeEqual(t, 200, resp.StatusCode)
 }
 
