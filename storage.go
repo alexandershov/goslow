@@ -3,7 +3,6 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
-	"errors"
 	"fmt"
 	_ "github.com/lib/pq"
 	_ "github.com/mattn/go-sqlite3"
@@ -33,7 +32,7 @@ func NewStorage(driver string, dataSource string) (*Storage, error) {
 }
 
 func (storage *Storage) FindRuleMatching(site string, req *http.Request) (rule *Rule, found bool, err error) {
-	rules, err := storage.getSiteRules(site)
+	rules, err := storage.getRules(site)
 	if err != nil {
 		return nil, false, err
 	}
@@ -45,7 +44,7 @@ func (storage *Storage) FindRuleMatching(site string, req *http.Request) (rule *
 	return nil, false, nil
 }
 
-func (storage *Storage) getSiteRules(site string) ([]*Rule, error) {
+func (storage *Storage) getRules(site string) ([]*Rule, error) {
 	rules := make([]*Rule, 0)
 	rows, err := storage.db.Query(storage.dialectify(GET_SITE_RULES_SQL), site)
 	if err != nil {
@@ -64,25 +63,30 @@ func (storage *Storage) getSiteRules(site string) ([]*Rule, error) {
 }
 
 func (storage *Storage) dialectify(sql string) string {
-	if storage.driver == "postgres" {
+	if storage.isPostgres() {
 		return sql
 	}
 	return POSTGRES_PLACEHOLDERS.ReplaceAllString(sql, "?")
 }
 
+func (storage *Storage) isPostgres() bool {
+	return storage.driver == "postgres"
+}
+
 func (storage *Storage) dialectifySchema(sql string) string {
-	if storage.driver == "postgres" {
+	if storage.isPostgres() {
 		return sql
 	}
-	return strings.Replace(sql, "BYTEA", "BLOB", -1)
+	// it's not pretty, but it covered by tests
+	return strings.Replace(sql, " BYTEA,", " BLOB,", -1)
 }
 
 func makeRule(rows *sql.Rows) (*Rule, error) {
 	rule := new(Rule)
 	var headersJson string
 	var delay int64
-	err := rows.Scan(&rule.Site, &rule.Path, &rule.Method, &headersJson, &delay, &rule.StatusCode,
-		&rule.Body)
+	err := rows.Scan(&rule.Site, &rule.Path, &rule.Method, &headersJson, &delay,
+		&rule.StatusCode, &rule.Body)
 	if err != nil {
 		return rule, err
 	}
@@ -107,18 +111,22 @@ func objectToStringMap(object map[string]interface{}) (map[string]string, error)
 		case string:
 			m[key] = value.(string)
 		default:
-			return nil, errors.New(fmt.Sprintf("Expecting string, got %+v", value))
+			return nil, fmt.Errorf("Expecting string, got %+v", value)
 		}
 	}
 	return m, nil
 }
 
-func (storage *Storage) UpsertRule(rule *Rule) error {
+func (storage *Storage) SaveRule(rule *Rule) error {
 	tx, err := storage.db.Begin()
 	if err != nil {
 		return err
 	}
+	// if tx gets commited then tx.Rollback() basically has no effect
+	// if there's some error, then we always want to rollback
 	defer tx.Rollback()
+	// upsert as delete-n-insert isn't correct in all cases (e.g concurrent upserts of the same rule)
+	// but is practical enough (concurrent upserts of the same rule are going to be extremely rare)
 	_, err = tx.Exec(storage.dialectify(DELETE_RULE_SQL), rule.Site, rule.Path, rule.Method)
 	if err != nil {
 		return err
@@ -127,7 +135,7 @@ func (storage *Storage) UpsertRule(rule *Rule) error {
 	if err != nil {
 		return err
 	}
-	_, err = tx.Exec(storage.dialectify(CREATE_RULE_SQL), rule.Site, rule.Path, rule.Method,
+	_, err = tx.Exec(storage.dialectify(INSERT_RULE_SQL), rule.Site, rule.Path, rule.Method,
 		headersJson, int64(rule.Delay), rule.StatusCode, rule.Body)
 	if err != nil {
 		return err
@@ -135,13 +143,13 @@ func (storage *Storage) UpsertRule(rule *Rule) error {
 	return tx.Commit()
 }
 
-func stringMapToJson(m map[string]string) (string, error) {
+func stringMapToJson(m map[string]string) (js string, err error) {
 	b, err := json.Marshal(m)
 	return string(b), err
 }
 
 func (storage *Storage) CreateSite(site string) error {
-	_, err := storage.db.Exec(storage.dialectify(CREATE_SITE_SQL), site)
+	_, err := storage.db.Exec(storage.dialectify(INSERT_SITE_SQL), site)
 	return err
 }
 

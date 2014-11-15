@@ -207,7 +207,7 @@ func (server *Server) addRule(site string, req *http.Request) (*Rule, error) {
 	if err != nil {
 		return nil, err
 	}
-	return rule, server.storage.UpsertRule(rule)
+	return rule, server.storage.SaveRule(rule)
 }
 
 func (server *Server) makeRule(site string, req *http.Request) (*Rule, error) {
@@ -416,7 +416,7 @@ func (server *Server) createDelayRules() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		err = server.storage.UpsertRule(&Rule{Site: delaySite, Headers: EMPTY_HEADERS, Delay: delay,
+		err = server.storage.SaveRule(&Rule{Site: delaySite, Headers: EMPTY_HEADERS, Delay: delay,
 			StatusCode: http.StatusOK, Body: DEFAULT_RESPONSE,
 		})
 		if err != nil {
@@ -433,7 +433,7 @@ func (server *Server) createStatusRules() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		err = server.storage.UpsertRule(&Rule{Site: statusSite, StatusCode: i,
+		err = server.storage.SaveRule(&Rule{Site: statusSite, StatusCode: i,
 			Headers: headers, Body: DEFAULT_RESPONSE})
 		if err != nil {
 			log.Fatal(err)

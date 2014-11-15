@@ -21,7 +21,7 @@ DELETE FROM rules
 WHERE site = $1 AND path = $2 AND method = $3
 `
 
-	CREATE_RULE_SQL = `
+	INSERT_RULE_SQL = `
 INSERT INTO rules
 (site, path, method, headers, delay, response_status, response_body)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -34,7 +34,7 @@ WHERE site = $1
 ORDER BY LENGTH(path) DESC, LENGTH(method) DESC
 `
 
-	CREATE_SITE_SQL = `
+	INSERT_SITE_SQL = `
 INSERT INTO sites
 (site)
 VALUES ($1)
