@@ -1,10 +1,10 @@
 ## Why?
-There comes a time in life when you need to test how your application handles slow/buggy
-external API responses. As long as you can easily configure API server domain name, goslow'll help you.
+Sometimes you need to test how your application handles slow/buggy
+external APIs. If you can easily configure API server domain name, then goslow'll help you.
 
 ## Quick start
 Let's say you're developing an application against the Facebook graph API and
-you want to see what happens when endpoint *graph.facebook.com/me* starts to respond in 10 seconds.
+you want to see what happens when the endpoint *graph.facebook.com/me* starts to respond in 10 seconds.
 
 Just configure your app to make requests to *10.goslow.link* instead of *graph.facebook.com*
 and you're set:
@@ -15,8 +15,9 @@ time curl 10.goslow.link/me
 10.023 total
 ```
 
-Well, almost set, because you got a JSON response that has no relation to graph API whatsoever.
-We'll get to that later.
+Well, almost set, because we've got response **{"goslow": "response"}**.
+What we really want to get is a standard graph API response: **{"name": "zuck", "gender": "male"}**.  
+No worries, we'll get to that later.
 
 By the way, different endpoints and POST requests also work:
 ```shell
@@ -163,13 +164,19 @@ bin/goslow --driver postgres --data-source postgres://user@host/dbname
 ```
 
 ## Contributing
-Contributing to goslow is easy.
-First, we need you to sign a contributor's agreement.
-Second, we need your boss to sign a waiver that she's okay with you
+Contributing to goslow is easy.  
+First, you need to sign a contributor agreement.  
+Second, your boss needs to sign a waiver that she's okay with you
 contributing to goslow.
 
-Just kidding. Open pull requests, send emails with patches/tarballs/links-to-pastebin
+Just kidding.  
+Create pull requests, open issues, send emails with patches/tarballs/links-to-pastebin
 to [codumentary.com@gmail.com](mailto:codumentary.com@gmail.com) Whatever makes you happy.
+Any form of contribution is welcome.
+
+## Get in touch:
+Got a question or an idea?
+I'd love to hear from you: [codumentary.com@gmail.com](mailto:codumentary.com@gmail.com)
 
 ## License
 MIT
