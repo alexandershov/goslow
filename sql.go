@@ -1,6 +1,10 @@
 package main
 
-// TODO: solve BYTEA/BLOB problem
+// to make queries work with both sqlite3 and postgres:
+// string " BYTEA," is replaced with " BLOB," in DDL statements
+// strings "$1", "$2", "$3", ... are replaced with "? in DML statements
+// when using sqlite3 driver
+
 const (
 	CREATE_SCHEMA_IF_NOT_EXISTS_SQL = `
 CREATE TABLE IF NOT EXISTS sites(
@@ -9,10 +13,9 @@ CREATE TABLE IF NOT EXISTS sites(
 
 CREATE TABLE IF NOT EXISTS rules (
   site TEXT, path TEXT, method TEXT, headers TEXT,
-  delay BIGINT, response_status INT, response_body BYTEA,
+  delay BIGINT, status_code INT, body BYTEA,
   PRIMARY KEY(site, path, method),
   FOREIGN KEY(site) REFERENCES sites(site)
-  -- TODO: check that foreign key works on postgres
 );
 `
 
@@ -23,12 +26,12 @@ WHERE site = $1 AND path = $2 AND method = $3
 
 	INSERT_RULE_SQL = `
 INSERT INTO rules
-(site, path, method, headers, delay, response_status, response_body)
+(site, path, method, headers, delay, status_code, body)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
 `
 
 	GET_SITE_RULES_SQL = `
-SELECT site, path, method, headers, delay, response_status, response_body
+SELECT site, path, method, headers, delay, status_code, body
 FROM rules
 WHERE site = $1
 ORDER BY LENGTH(path) DESC, LENGTH(method) DESC
@@ -41,7 +44,7 @@ VALUES ($1)
 `
 
 	GET_SITE_SQL = `
-SELECT *
+SELECT site
 FROM sites
 WHERE site = $1
 `
