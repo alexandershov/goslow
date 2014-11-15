@@ -21,7 +21,7 @@ func (rule *Rule) Matches(req *http.Request) bool {
 
 func matches(pattern, name string) bool {
 	// empty pattern matches anything
-	if pattern == "" {
+	if pattern == ANY {
 		return true
 	}
 	return pattern == name

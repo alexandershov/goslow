@@ -34,7 +34,7 @@ type TestCase struct {
 func TestZeroSite(t *testing.T) {
 	server, _ := newSubDomainServer(TestCase{createDefaultRules: true, singleDomainUrlPath: ""})
 	defer server.Close()
-	shouldBeEqual(t, readBody(GET(server.URL, "/", makeHost("0", HOST))), string(DEFAULT_RESPONSE))
+	shouldBeEqual(t, readBody(GET(server.URL, "/", makeHost("0", HOST))), string(DEFAULT_BODY))
 }
 
 func TestRedefineBuiltinSites(t *testing.T) {
