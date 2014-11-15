@@ -236,6 +236,7 @@ func (server *Server) makeRule(site string, req *http.Request) (*Rule, error) {
 
 // TODO: return human readable error, not default strconv.ParseFload error
 // look at different places where you can supply good error message
+// TODO: set a 99 seconds limit on delay
 func getRuleDelay(values url.Values) (time.Duration, error) {
 	_, contains := values[DELAY_PARAM]
 	if !contains {
