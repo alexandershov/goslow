@@ -55,6 +55,8 @@ var (
 		NewTestCase(true, "", "sqlite3"),
 		NewTestCase(true, "", "postgres"),
 	}
+
+	// TODO: remove duplication
 	ruleCreationTestCases = TestCases{
 		NewTestCase(true, "", "sqlite3"),
 		NewTestCase(true, "", "postgres"),
@@ -93,6 +95,10 @@ func runnable(testCases TestCases) TestCases {
 }
 
 func runZeroSite(t *testing.T, testCase *TestCase) {
+	if testCase.driver == "postgres" {
+		createDb(TEST_DB)
+		defer dropDb(TEST_DB)
+	}
 	server, _ := newSubDomainServer(testCase)
 	defer server.Close()
 	shouldBeEqual(t, readBody(GET(server.URL, "/", makeHost("0", HOST))), DEFAULT_BODY)
@@ -105,6 +111,10 @@ func TestRedefineBuiltinSites(t *testing.T) {
 }
 
 func runRedefineBuiltinSites(t *testing.T, testCase *TestCase) {
+	if testCase.driver == "postgres" {
+		createDb(TEST_DB)
+		defer dropDb(TEST_DB)
+	}
 	server, _ := newSubDomainServer(testCase)
 	defer server.Close()
 	addRule(t, server, &Rule{Site: "0", Path: "/test", Body: []byte("hop"), Method: "GET"}, http.StatusForbidden)
@@ -117,6 +127,10 @@ func TestDelay(t *testing.T) {
 }
 
 func runDelay(t *testing.T, testCase *TestCase) {
+	if testCase.driver == "postgres" {
+		createDb(TEST_DB)
+		defer dropDb(TEST_DB)
+	}
 	server, _ := newSubDomainServer(testCase)
 	defer server.Close()
 	shouldRespondIn(t, createGET(server.URL, "/", makeHost("0", HOST)), 0, 0.1)
@@ -130,6 +144,10 @@ func TestStatus(t *testing.T) {
 }
 
 func runStatus(t *testing.T, testCase *TestCase) {
+	if testCase.driver == "postgres" {
+		createDb(TEST_DB)
+		defer dropDb(TEST_DB)
+	}
 	server, _ := newSubDomainServer(testCase)
 	defer server.Close()
 	for _, statusCode := range []int{200, 404, 500} {
@@ -145,10 +163,6 @@ func TestRuleCreation(t *testing.T) {
 }
 
 func runRuleCreationTestCase(t *testing.T, testCase *TestCase) {
-	log.Printf("running test")
-	if testCase.driver == "postgres" && testing.Short() {
-		return
-	}
 	if testCase.driver == "postgres" {
 		createDb(TEST_DB)
 		defer dropDb(TEST_DB)
