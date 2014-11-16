@@ -15,8 +15,8 @@ import (
 )
 
 const (
-	HOST    = "localhost:9999"
-	TEST_DB = "goslow_test"
+	TEST_ENDPOINT = "localhost:9999"
+	TEST_DB       = "goslow_test"
 )
 
 var DATA_SOURCE = map[string]string{
@@ -50,6 +50,8 @@ func (testCase *TestCase) skippable() bool {
 
 type TestCases []*TestCase
 
+type CheckFunc func(*testing.T, *httptest.Server, *TestCase)
+
 var (
 	defaultTestCases = TestCases{
 		NewTestCase(true, "", "sqlite3"),
@@ -80,7 +82,7 @@ var (
 
 func TestZeroSite(t *testing.T) {
 	for _, testCase := range runnable(defaultTestCases) {
-		runZeroSite(t, testCase)
+		run(t, checkZeroSite, testCase)
 	}
 }
 
@@ -94,7 +96,7 @@ func runnable(testCases TestCases) TestCases {
 	return runnableTestCases
 }
 
-func runZeroSite(t *testing.T, testCase *TestCase) {
+func run(t *testing.T, checkFunc CheckFunc, testCase *TestCase) {
 	if testCase.driver == "postgres" {
 		createDb(TEST_DB)
 		defer dropDb(TEST_DB)
@@ -102,80 +104,56 @@ func runZeroSite(t *testing.T, testCase *TestCase) {
 	server, goSlowServer := newSubDomainServer(testCase)
 	defer goSlowServer.storage.db.Close()
 	defer server.Close()
-	shouldBeEqual(t, readBody(GET(server.URL, "/", makeHost("0", HOST))), DEFAULT_BODY)
+	checkFunc(t, server, testCase)
+}
+
+func checkZeroSite(t *testing.T, server *httptest.Server, testCase *TestCase) {
+	shouldBeEqual(t, readBody(GET(server.URL, "/", makeHost("0", TEST_ENDPOINT))), DEFAULT_BODY)
 }
 
 func TestRedefineBuiltinSites(t *testing.T) {
 	for _, testCase := range runnable(defaultTestCases) {
-		runRedefineBuiltinSites(t, testCase)
+		run(t, checkRedefineBuiltinSites, testCase)
 	}
 }
 
-func runRedefineBuiltinSites(t *testing.T, testCase *TestCase) {
-	if testCase.driver == "postgres" {
-		createDb(TEST_DB)
-		defer dropDb(TEST_DB)
-	}
-	server, goSlowServer := newSubDomainServer(testCase)
-	defer goSlowServer.storage.db.Close()
-	defer server.Close()
+func checkRedefineBuiltinSites(t *testing.T, server *httptest.Server, testCase *TestCase) {
 	addRule(t, server, &Rule{Site: "0", Path: "/test", Body: []byte("hop"), Method: "GET"}, http.StatusForbidden)
 }
 
 func TestDelay(t *testing.T) {
 	for _, testCase := range runnable(defaultTestCases) {
-		runDelay(t, testCase)
+		run(t, checkDelay, testCase)
 	}
 }
 
-func runDelay(t *testing.T, testCase *TestCase) {
-	if testCase.driver == "postgres" {
-		createDb(TEST_DB)
-		defer dropDb(TEST_DB)
-	}
-	server, goSlowServer := newSubDomainServer(testCase)
-	defer goSlowServer.storage.db.Close()
-	defer server.Close()
-	shouldRespondIn(t, createGET(server.URL, "/", makeHost("0", HOST)), 0, 0.1)
-	shouldRespondIn(t, createGET(server.URL, "/", makeHost("1", HOST)), 1, 1.1)
+func checkDelay(t *testing.T, server *httptest.Server, testCase *TestCase) {
+	shouldRespondIn(t, createGET(server.URL, "/", makeHost("0", TEST_ENDPOINT)), 0, 0.1)
+	shouldRespondIn(t, createGET(server.URL, "/", makeHost("1", TEST_ENDPOINT)), 1, 1.1)
 }
 
 func TestStatus(t *testing.T) {
 	for _, testCase := range runnable(defaultTestCases) {
-		runStatus(t, testCase)
+		run(t, checkStatus, testCase)
 	}
 }
 
-func runStatus(t *testing.T, testCase *TestCase) {
-	if testCase.driver == "postgres" {
-		createDb(TEST_DB)
-		defer dropDb(TEST_DB)
-	}
-	server, goSlowServer := newSubDomainServer(testCase)
-	defer goSlowServer.storage.db.Close()
-	defer server.Close()
+func checkStatus(t *testing.T, server *httptest.Server, testCase *TestCase) {
 	for _, statusCode := range []int{200, 404, 500} {
-		resp := GET(server.URL, "/", makeHost(strconv.Itoa(statusCode), HOST))
+		resp := GET(server.URL, "/", makeHost(strconv.Itoa(statusCode), TEST_ENDPOINT))
 		intShouldBeEqual(t, statusCode, resp.StatusCode)
 	}
 }
 
 func TestRuleCreation(t *testing.T) {
 	for _, testCase := range runnable(ruleCreationTestCases) {
-		runRuleCreationTestCase(t, testCase)
+		run(t, checkRuleCreationTestCase, testCase)
 	}
 }
 
-func runRuleCreationTestCase(t *testing.T, testCase *TestCase) {
-	if testCase.driver == "postgres" {
-		createDb(TEST_DB)
-		defer dropDb(TEST_DB)
-	}
-	server, goSlowServer := newSubDomainServer(testCase)
-	defer goSlowServer.storage.db.Close()
+func checkRuleCreationTestCase(t *testing.T, server *httptest.Server, testCase *TestCase) {
 	prefix := testCase.singleDomainUrlPath
-	defer server.Close()
-	var site = ""
+	site := ""
 	if prefix == "" {
 		site = newSite(server, join(prefix, "/"), "haha")
 	} else {
@@ -195,7 +173,7 @@ func runRuleCreationTestCase(t *testing.T, testCase *TestCase) {
 
 func newSubDomainServer(testCase *TestCase) (*httptest.Server, *Server) {
 	config := DEFAULT_CONFIG // copies DEFAULT_CONFIG
-	config.endpoint = HOST
+	config.endpoint = TEST_ENDPOINT
 	config.createDefaultRules = testCase.createDefaultRules
 	config.singleDomainUrlPath = testCase.singleDomainUrlPath
 	if testCase.driver != "" {
@@ -271,7 +249,7 @@ func toDuration(seconds float64) time.Duration {
 
 func newSite(server *httptest.Server, path, response string) string {
 	resp := POST(server.URL, fmt.Sprintf("%s?output=short&method=GET", path),
-		makeHost("create", HOST), response)
+		makeHost("create", TEST_ENDPOINT), response)
 	return string(readBody(resp))
 }
 
@@ -294,7 +272,7 @@ func addRule(t *testing.T, server *httptest.Server, rule *Rule, statusCode int) 
 	path := rule.Path
 	path += "?method=" + rule.Method
 	path += fmt.Sprintf("&delay=%f", rule.Delay.Seconds())
-	resp := POST(server.URL, path, makeHost("admin-"+rule.Site, HOST),
+	resp := POST(server.URL, path, makeHost("admin-"+rule.Site, TEST_ENDPOINT),
 		string(rule.Body))
 	intShouldBeEqual(t, statusCode, resp.StatusCode)
 }
