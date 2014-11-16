@@ -99,7 +99,8 @@ func runZeroSite(t *testing.T, testCase *TestCase) {
 		createDb(TEST_DB)
 		defer dropDb(TEST_DB)
 	}
-	server, _ := newSubDomainServer(testCase)
+	server, goSlowServer := newSubDomainServer(testCase)
+	defer goSlowServer.storage.db.Close()
 	defer server.Close()
 	shouldBeEqual(t, readBody(GET(server.URL, "/", makeHost("0", HOST))), DEFAULT_BODY)
 }
@@ -115,7 +116,8 @@ func runRedefineBuiltinSites(t *testing.T, testCase *TestCase) {
 		createDb(TEST_DB)
 		defer dropDb(TEST_DB)
 	}
-	server, _ := newSubDomainServer(testCase)
+	server, goSlowServer := newSubDomainServer(testCase)
+	defer goSlowServer.storage.db.Close()
 	defer server.Close()
 	addRule(t, server, &Rule{Site: "0", Path: "/test", Body: []byte("hop"), Method: "GET"}, http.StatusForbidden)
 }
@@ -131,7 +133,8 @@ func runDelay(t *testing.T, testCase *TestCase) {
 		createDb(TEST_DB)
 		defer dropDb(TEST_DB)
 	}
-	server, _ := newSubDomainServer(testCase)
+	server, goSlowServer := newSubDomainServer(testCase)
+	defer goSlowServer.storage.db.Close()
 	defer server.Close()
 	shouldRespondIn(t, createGET(server.URL, "/", makeHost("0", HOST)), 0, 0.1)
 	shouldRespondIn(t, createGET(server.URL, "/", makeHost("1", HOST)), 1, 1.1)
@@ -148,7 +151,8 @@ func runStatus(t *testing.T, testCase *TestCase) {
 		createDb(TEST_DB)
 		defer dropDb(TEST_DB)
 	}
-	server, _ := newSubDomainServer(testCase)
+	server, goSlowServer := newSubDomainServer(testCase)
+	defer goSlowServer.storage.db.Close()
 	defer server.Close()
 	for _, statusCode := range []int{200, 404, 500} {
 		resp := GET(server.URL, "/", makeHost(strconv.Itoa(statusCode), HOST))
