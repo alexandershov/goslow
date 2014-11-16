@@ -436,26 +436,24 @@ func addHeaders(headers map[string]string, responseHeader http.Header) {
 }
 
 func (server *Server) createDefaultRules() {
-	server.createDelayRules()
-	server.createStatusCodeRules()
+	server.createRules(MIN_DELAY, MAX_DELAY)
+	server.createRules(MIN_STATUS_CODE, MAX_STATUS_CODE)
 }
 
-// TODO: remove duplication with createStatusCodeRules
-func (server *Server) createDelayRules() {
-	for i := MIN_DELAY; i <= MAX_DELAY; i++ {
-		delaySite := strconv.Itoa(i)
-		delay := time.Duration(i) * time.Second
-		err := server.storage.CreateSite(delaySite)
+func (server *Server) createRules(minSite, maxSite int) {
+	for i := minSite; i <= maxSite; i++ {
+		site := strconv.Itoa(i)
+		err := server.storage.CreateSite(site)
 		if err != nil {
 			log.Fatal(err)
 		}
 		rule := &Rule{
-			Site:       delaySite,
+			Site:       site,
 			Path:       ANY,
 			Method:     ANY,
-			Headers:    EMPTY_HEADERS,
-			Delay:      delay,
-			StatusCode: http.StatusOK,
+			Headers:    server.headersFor(i),
+			Delay:      server.delayFor(i),
+			StatusCode: server.statusFor(i),
 			Body:       DEFAULT_BODY,
 		}
 		err = server.storage.SaveRule(rule)
@@ -465,28 +463,28 @@ func (server *Server) createDelayRules() {
 	}
 }
 
-func (server *Server) createStatusCodeRules() {
-	for i := MIN_STATUS_CODE; i <= MAX_STATUS_CODE; i++ {
-		statusSite := strconv.Itoa(i)
-		headers := server.headersForStatus(i)
-		err := server.storage.CreateSite(statusSite)
-		if err != nil {
-			log.Fatal(err)
-		}
-		rule := &Rule{
-			Site:       statusSite,
-			Path:       ANY,
-			Method:     ANY,
-			Headers:    headers,
-			Delay:      DEFAULT_DELAY,
-			StatusCode: i,
-			Body:       DEFAULT_BODY,
-		}
-		err = server.storage.SaveRule(rule)
-		if err != nil {
-			log.Fatal(err)
-		}
+func (server *Server) headersFor(site int) map[string]string {
+	_, isRedirect := REDIRECT_STATUSES[site]
+	if isRedirect {
+		// TODO: check that protocol-independent location is legal HTTP
+		host := fmt.Sprintf("//%s", server.makeFullDomain(ZERO_DELAY_SITE))
+		return map[string]string{"Location": host}
 	}
+	return EMPTY_HEADERS
+}
+
+func (server *Server) delayFor(site int) time.Duration {
+	if site <= MAX_DELAY {
+		return time.Duration(site) * time.Second
+	}
+	return time.Duration(0)
+}
+
+func (server *Server) statusFor(site int) int {
+	if site >= MIN_STATUS_CODE && site <= MAX_STATUS_CODE {
+		return site
+	}
+	return http.StatusOK
 }
 
 func (server *Server) ensureEmptySiteExists() {
@@ -500,16 +498,6 @@ func (server *Server) ensureEmptySiteExists() {
 			log.Fatal(err)
 		}
 	}
-}
-
-func (server *Server) headersForStatus(status int) map[string]string {
-	_, isRedirect := REDIRECT_STATUSES[status]
-	if isRedirect {
-		// TODO: check that protocol-independent location is legal HTTP
-		host := fmt.Sprintf("//%s", server.makeFullDomain(ZERO_DELAY_SITE))
-		return map[string]string{"Location": host}
-	}
-	return EMPTY_HEADERS
 }
 
 func (server *Server) ListenAndServe() error {
