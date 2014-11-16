@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -29,23 +30,6 @@ type TestCase struct {
 	singleDomainUrlPath string
 	driver              string
 	dataSource          string
-}
-
-func NewTestCase(createDefaultRules bool, singleDomainUrlPath string, driver string) *TestCase {
-	dataSource, knownDriver := DATA_SOURCE[driver]
-	if !knownDriver {
-		log.Fatalf("unknown driver: <%s>", driver)
-	}
-	return &TestCase{
-		createDefaultRules:  createDefaultRules,
-		singleDomainUrlPath: singleDomainUrlPath,
-		driver:              driver,
-		dataSource:          dataSource,
-	}
-}
-
-func (testCase *TestCase) skippable() bool {
-	return testCase.driver == "postgres" && testing.Short()
 }
 
 type TestCases []*TestCase
@@ -80,6 +64,23 @@ var (
 	}
 )
 
+func NewTestCase(createDefaultRules bool, singleDomainUrlPath string, driver string) *TestCase {
+	dataSource, knownDriver := DATA_SOURCE[driver]
+	if !knownDriver {
+		log.Fatalf("unknown driver: <%s>", driver)
+	}
+	return &TestCase{
+		createDefaultRules:  createDefaultRules,
+		singleDomainUrlPath: singleDomainUrlPath,
+		driver:              driver,
+		dataSource:          dataSource,
+	}
+}
+
+func (testCase *TestCase) skippable() bool {
+	return testCase.driver == "postgres" && testing.Short()
+}
+
 func TestZeroSite(t *testing.T) {
 	for _, testCase := range runnable(defaultTestCases) {
 		run(t, checkZeroSite, testCase)
@@ -101,14 +102,17 @@ func run(t *testing.T, checkFunc CheckFunc, testCase *TestCase) {
 		createDb(TEST_DB)
 		defer dropDb(TEST_DB)
 	}
-	server, goSlowServer := newSubDomainServer(testCase)
-	defer goSlowServer.storage.db.Close()
+	goSlowServer := newSubDomainServer(testCase)
+	server := httptest.NewServer(goSlowServer)
 	defer server.Close()
+	defer goSlowServer.storage.db.Close()
 	checkFunc(t, server, testCase)
 }
 
 func checkZeroSite(t *testing.T, server *httptest.Server, testCase *TestCase) {
-	shouldBeEqual(t, readBody(GET(server.URL, "/", makeHost("0", TEST_ENDPOINT))), DEFAULT_BODY)
+	bytesShouldBeEqual(t,
+		readBody(GET(server.URL, "/", makeHost("0", TEST_ENDPOINT))),
+		DEFAULT_BODY)
 }
 
 func TestRedefineBuiltinSites(t *testing.T) {
@@ -118,7 +122,10 @@ func TestRedefineBuiltinSites(t *testing.T) {
 }
 
 func checkRedefineBuiltinSites(t *testing.T, server *httptest.Server, testCase *TestCase) {
-	addRule(t, server, &Rule{Site: "0", Path: "/test", Body: []byte("hop"), Method: "GET"}, http.StatusForbidden)
+	for _, site := range []string{"0", "99", "500", "create"} {
+		resp := addRule(server, &Rule{Site: site, Path: "/test", Body: []byte("hop"), Method: "GET"})
+		shouldHaveStatusCode(t, http.StatusForbidden, resp)
+	}
 }
 
 func TestDelay(t *testing.T) {
@@ -128,8 +135,12 @@ func TestDelay(t *testing.T) {
 }
 
 func checkDelay(t *testing.T, server *httptest.Server, testCase *TestCase) {
-	shouldRespondIn(t, createGET(server.URL, "/", makeHost("0", TEST_ENDPOINT)), 0, 0.1)
-	shouldRespondIn(t, createGET(server.URL, "/", makeHost("1", TEST_ENDPOINT)), 1, 1.1)
+	shouldRespondIn(t,
+		createGET(server.URL, "/", makeHost("0", TEST_ENDPOINT)),
+		0, 0.1) // seconds
+	shouldRespondIn(t,
+		createGET(server.URL, "/", makeHost("1", TEST_ENDPOINT)),
+		1, 1.1) // seconds
 }
 
 func TestStatus(t *testing.T) {
@@ -141,7 +152,7 @@ func TestStatus(t *testing.T) {
 func checkStatus(t *testing.T, server *httptest.Server, testCase *TestCase) {
 	for _, statusCode := range []int{200, 404, 500} {
 		resp := GET(server.URL, "/", makeHost(strconv.Itoa(statusCode), TEST_ENDPOINT))
-		intShouldBeEqual(t, statusCode, resp.StatusCode)
+		shouldHaveStatusCode(t, statusCode, resp)
 	}
 }
 
@@ -151,37 +162,39 @@ func TestRuleCreation(t *testing.T) {
 	}
 }
 
+// TODO: refactor
 func checkRuleCreationTestCase(t *testing.T, server *httptest.Server, testCase *TestCase) {
 	prefix := testCase.singleDomainUrlPath
 	site := ""
 	if prefix == "" {
-		site = newSite(server, join(prefix, "/"), "haha")
+		site = newSite(server, join(prefix, "/"), []byte("haha"))
 	} else {
-		addRule(t, server, &Rule{Path: join(prefix, "/"), Body: []byte("haha")}, 200)
+		resp := addRule(server, &Rule{Path: join(prefix, "/"), Body: []byte("haha")})
+		shouldHaveStatusCode(t, http.StatusOK, resp)
 	}
-	shouldBeEqual(t, readBody(GET(server.URL, "/", site)), []byte("haha"))
-	addRule(t, server, &Rule{Site: site, Path: join(prefix, "/test"), Body: []byte("hop"), Method: "GET"}, 200)
-	shouldBeEqual(t, readBody(GET(server.URL, "/test", site)), []byte("hop"))
-	resp := POST(server.URL, "/test", site, "")
+	bytesShouldBeEqual(t, readBody(GET(server.URL, "/", site)), []byte("haha"))
+	resp := addRule(server, &Rule{Site: site, Path: join(prefix, "/test"), Body: []byte("hop"), Method: "GET"})
+	shouldHaveStatusCode(t, http.StatusOK, resp)
+
+	bytesShouldBeEqual(t, readBody(GET(server.URL, "/test", site)), []byte("hop"))
+	resp = POST(server.URL, "/test", site, []byte(""))
 	intShouldBeEqual(t, 404, resp.StatusCode)
-	addRule(t, server, &Rule{Site: site, Path: join(prefix, "/test"), Body: []byte("for POST"), Method: "POST",
-		Delay: time.Duration(100) * time.Millisecond}, 200)
-	shouldBeEqual(t, readBody(GET(server.URL, "/test", site)), []byte("hop"))
-	shouldBeEqual(t, readBody(POST(server.URL, "/test", site, "")), []byte("for POST"))
-	shouldRespondIn(t, createPOST(server.URL, "/test", site, ""), 0.1, 0.15)
+	resp = addRule(server, &Rule{Site: site, Path: join(prefix, "/test"), Body: []byte("for POST"), Method: "POST",
+		Delay: time.Duration(100) * time.Millisecond})
+	shouldHaveStatusCode(t, http.StatusOK, resp)
+	bytesShouldBeEqual(t, readBody(GET(server.URL, "/test", site)), []byte("hop"))
+	bytesShouldBeEqual(t, readBody(POST(server.URL, "/test", site, []byte(""))), []byte("for POST"))
+	shouldRespondIn(t, createPOST(server.URL, "/test", site, []byte("")), 0.1, 0.15)
 }
 
-func newSubDomainServer(testCase *TestCase) (*httptest.Server, *Server) {
+func newSubDomainServer(testCase *TestCase) *Server {
 	config := DEFAULT_CONFIG // copies DEFAULT_CONFIG
 	config.endpoint = TEST_ENDPOINT
 	config.createDefaultRules = testCase.createDefaultRules
 	config.singleDomainUrlPath = testCase.singleDomainUrlPath
-	if testCase.driver != "" {
-		config.driver = testCase.driver
-		config.dataSource = testCase.dataSource
-	}
-	handler := NewServer(&config)
-	return httptest.NewServer(handler), handler
+	config.driver = testCase.driver
+	config.dataSource = testCase.dataSource
+	return NewServer(&config)
 }
 
 func GET(url, path, host string) *http.Response {
@@ -218,8 +231,8 @@ func makeHost(subdomain, host string) string {
 	return fmt.Sprintf("%s.%s", subdomain, host)
 }
 
-func shouldBeEqual(t *testing.T, expected, actual []byte) {
-	if string(expected) != string(actual) {
+func bytesShouldBeEqual(t *testing.T, expected, actual []byte) {
+	if !bytes.Equal(expected, actual) {
 		t.Fatalf("<<%v>> != <<%v>>", string(expected), string(actual))
 	}
 }
@@ -230,37 +243,40 @@ func intShouldBeEqual(t *testing.T, expected, actual int) {
 	}
 }
 
-func shouldRespondIn(t *testing.T, req *http.Request, min, max float64) {
+func shouldRespondIn(t *testing.T, req *http.Request, minSeconds, maxSeconds float64) {
 	start := time.Now()
 	resp := do(req)
 	readBody(resp)
 	duration := time.Since(start)
-	minDuration := toDuration(min)
-	maxDuration := toDuration(max)
-	if duration > maxDuration || minDuration > duration {
+	minDuration := toDuration(minSeconds)
+	maxDuration := toDuration(maxSeconds)
+	if duration < minDuration || duration > maxDuration {
 		t.Fatalf("%s%s answered in %v. Not in the interval [%v; %v]",
 			req.Host, req.URL.Path, duration, minDuration, maxDuration)
 	}
+}
+
+func shouldHaveStatusCode(t *testing.T, statusCode int, resp *http.Response) {
+	intShouldBeEqual(t, statusCode, resp.StatusCode)
 }
 
 func toDuration(seconds float64) time.Duration {
 	return time.Duration(seconds*1000) * time.Millisecond
 }
 
-func newSite(server *httptest.Server, path, response string) string {
+func newSite(server *httptest.Server, path string, response []byte) string {
 	resp := POST(server.URL, fmt.Sprintf("%s?output=short&method=GET", path),
 		makeHost("create", TEST_ENDPOINT), response)
 	return string(readBody(resp))
 }
 
-func POST(url, path, host, payload string) *http.Response {
-	log.Printf("posting %s", path)
+func POST(url, path, host string, payload []byte) *http.Response {
 	req := createPOST(url, path, host, payload)
 	return do(req)
 }
 
-func createPOST(url, path, host, payload string) *http.Request {
-	req, err := http.NewRequest("POST", url+path, strings.NewReader(payload))
+func createPOST(url, path, host string, payload []byte) *http.Request {
+	req, err := http.NewRequest("POST", url+path, bytes.NewReader(payload))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -268,17 +284,19 @@ func createPOST(url, path, host, payload string) *http.Request {
 	return req
 }
 
-func addRule(t *testing.T, server *httptest.Server, rule *Rule, statusCode int) {
+// TODO: use normal GET-parameters builder, not Sprintf and string concatenation
+func addRule(server *httptest.Server, rule *Rule) *http.Response {
 	path := rule.Path
 	path += "?method=" + rule.Method
 	path += fmt.Sprintf("&delay=%f", rule.Delay.Seconds())
-	resp := POST(server.URL, path, makeHost("admin-"+rule.Site, TEST_ENDPOINT),
-		string(rule.Body))
-	intShouldBeEqual(t, statusCode, resp.StatusCode)
+	return POST(server.URL, path, makeHost("admin-"+rule.Site, TEST_ENDPOINT),
+		rule.Body)
 }
 
+// Wrapper around path.Join. Preserves trailing slash
 func join(elem ...string) string {
-	shouldEndWithSlash := strings.HasSuffix(elem[len(elem)-1], "/")
+	lastElem := elem[len(elem)-1]
+	shouldEndWithSlash := strings.HasSuffix(lastElem, "/")
 	joined := path.Join(elem...)
 	if shouldEndWithSlash && !strings.HasSuffix(joined, "/") {
 		joined += "/"
