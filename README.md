@@ -1,12 +1,12 @@
 ## Why?
 Sometimes you need to test how your application handles slow/buggy
-external APIs. If you can easily configure API server domain name, then goslow'll help you.
+external APIs. If you can easily configure API server domain name, then goslow will help you.
 
 ## Quick start
 Let's say you're developing an application against the Facebook graph API and
 you want to see what happens when the endpoint *graph.facebook.com/me* starts to respond in 10 seconds.
 
-Just configure your app to make requests to *10.goslow.link* instead of *graph.facebook.com*
+Just configure your app to make the requests to *10.goslow.link* instead of *graph.facebook.com*
 and you're set:
 
 ```shell
@@ -15,7 +15,7 @@ time curl 10.goslow.link/me
 10.023 total
 ```
 
-Well, almost set, because we've got response **{"goslow": "response"}**.
+Well, almost set, because we've got a canned response **{"goslow": "response"}**.
 What we really want to get is a standard graph API response: **{"name": "zuck", "gender": "male"}**.  
 No worries, we'll get to that later.
 
@@ -44,12 +44,12 @@ time curl 99.goslow.link/me
 
 Need to simulate a 500 seconds delay? Use *500.goslow.link*, right?
 
-No. Domains *100.goslow.link*, *101.goslow.link*, ..., *599.goslow.link* respond with
+Nope. Domains *100.goslow.link*, *101.goslow.link*, ..., *599.goslow.link* respond with
 HTTP status code 100, 101, ..., 599 without any delay:
 
 ```shell
 time curl 500.goslow.link/me
-Internal Server Error
+{"goslow": "response"}%
 0.052 total
 ```
 
@@ -60,46 +60,50 @@ Internal Server Error
 Let's return to the Facebook graph API example.
 Let's say you're using the endpoint *graph.facebook.com/me* and you want to:
 1. Slow it down by 5 seconds
-2. Get {"id": 4, "username": "Zuck"} in response.
+2. Get **{"name": "zuck", "gender": "male"}** in response.
 
 Just make a POST request to *create.goslow.link/me?delay=5* and you're set.
 ```shell
-curl -d '{"id": 4, "username": "Zuck"}' 'create.goslow.link/me?delay=5'
-Your goslow domain is: dk8kjs.goslow.link
+curl -d '{"name": "zuck", "gender": "male"}' 'create.goslow.link/me?delay=5'
+
+Endpoint k6zzki4xj.goslow.link/me/ now responds to any HTTP method with the delay 5s. Response is:
+{"id": 4, "username": "Zuck"}
+
+Your goslow domain is k6zzki4xj.goslow.link
 ...
 ```
 
-Now, what's the deal with the "*your goslow domain dk8kjs.goslow.link*"?
+Now, what's the deal with the "*your goslow domain k6zzki4xj.goslow.link*"?
 
 In the real world your goslow domain will be different
-from the *dk8kjs.goslow.link*. (names are randomly generated) For the sake of example let's assume that randomly
-generated domain name is *dk8kjs.goslow.link*
+from the *k6zzki4xj.goslow.link*. (names are randomly generated) For the sake of example let's assume that randomly
+generated domain name is *k6zzki4xj.goslow.link*
 
 Now you can send requests to your domain:
 ```shell
-time curl dk8kjs.goslow.link/users
+time curl k6zzki4xj.goslow.link/users
 '{"my": "response"}'
 5.382 total
 ```
 
-And configure it with POST requests to *admin-dk8kjs.goslow.link*
-Let's make endpoint *dk8kjs.goslow.link/another/* to respond with **{"another": "response"}**
+And configure it with POST requests to *admin-k6zzki4xj.goslow.link*
+Let's make endpoint *k6zzki4xj.goslow.link/another/* to respond with **{"another": "response"}**
 and 3 seconds delay:
 ```shell
-curl -d '{"another": "response"}' 'admin-dk8kjs.goslow.link/another/?delay=3'
+curl -d '{"another": "response"}' 'admin-k6zzki4xj.goslow.link/another/?delay=3'
 dk8kjs.goslow.link/another/ will now respond with 3 seconds delay.
 Response is '{"another": "response"}'
 ```
 
 Now you have two urls responding with different JSON and delay.
 ```shell
-time curl dk8kjs.goslow.link/another/
+time curl k6zzki4xj.goslow.link/another/
 '{"another": "response"}'
 3.182 total
 ```
 
 ```shell
-time curl dk8kjs.goslow.link/users
+time curl k6zzki4xj.goslow.link/users
 '{"my": "response"}'
 5.028 total
 ```
