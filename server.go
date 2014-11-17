@@ -156,7 +156,7 @@ func (server *Server) isCreateSite(req *http.Request) bool {
 }
 
 func (server *Server) isInSingleSiteMode() bool {
-	return server.config.singleDomainUrlPath != ""
+	return server.config.adminUrlPathPrefix != ""
 }
 
 func getSubdomain(url string) string {
@@ -359,7 +359,7 @@ func (server *Server) isAddRule(req *http.Request) bool {
 
 // TODO: rewrite
 func (server *Server) isAddRulePath(path string) bool {
-	addRulePath := server.config.singleDomainUrlPath
+	addRulePath := server.config.adminUrlPathPrefix
 	if !strings.HasPrefix(path, addRulePath) {
 		return false
 	}
@@ -409,7 +409,7 @@ func isDefaultRuleSite(site string) bool {
 
 func (server *Server) getRulePath(req *http.Request) string {
 	if server.isInSingleSiteMode() {
-		path := strings.TrimPrefix(req.URL.Path, server.config.singleDomainUrlPath)
+		path := strings.TrimPrefix(req.URL.Path, server.config.adminUrlPathPrefix)
 		return ensureHasPrefix(path, "/")
 	}
 	return req.URL.Path

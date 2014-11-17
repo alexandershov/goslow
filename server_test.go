@@ -26,10 +26,10 @@ var DATA_SOURCE = map[string]string{
 }
 
 type TestCase struct {
-	createDefaultRules  bool
-	singleDomainUrlPath string
-	driver              string
-	dataSource          string
+	createDefaultRules bool
+	adminUrlPathPrefix string
+	driver             string
+	dataSource         string
 }
 
 type TestCases []*TestCase
@@ -64,16 +64,16 @@ var (
 	}
 )
 
-func NewTestCase(createDefaultRules bool, singleDomainUrlPath string, driver string) *TestCase {
+func NewTestCase(createDefaultRules bool, adminUrlPathPrefix string, driver string) *TestCase {
 	dataSource, knownDriver := DATA_SOURCE[driver]
 	if !knownDriver {
 		log.Fatalf("unknown driver: <%s>", driver)
 	}
 	return &TestCase{
-		createDefaultRules:  createDefaultRules,
-		singleDomainUrlPath: singleDomainUrlPath,
-		driver:              driver,
-		dataSource:          dataSource,
+		createDefaultRules: createDefaultRules,
+		adminUrlPathPrefix: adminUrlPathPrefix,
+		driver:             driver,
+		dataSource:         dataSource,
 	}
 }
 
@@ -164,7 +164,7 @@ func TestRuleCreation(t *testing.T) {
 
 // TODO: refactor
 func checkRuleCreationTestCase(t *testing.T, server *httptest.Server, testCase *TestCase) {
-	prefix := testCase.singleDomainUrlPath
+	prefix := testCase.adminUrlPathPrefix
 	site := ""
 	if prefix == "" {
 		site = newSite(server, join(prefix, "/"), []byte("haha"))
@@ -191,7 +191,7 @@ func newSubDomainServer(testCase *TestCase) *Server {
 	config := DEFAULT_CONFIG // copies DEFAULT_CONFIG
 	config.endpoint = TEST_ENDPOINT
 	config.createDefaultRules = testCase.createDefaultRules
-	config.singleDomainUrlPath = testCase.singleDomainUrlPath
+	config.adminUrlPathPrefix = testCase.adminUrlPathPrefix
 	config.driver = testCase.driver
 	config.dataSource = testCase.dataSource
 	return NewServer(&config)

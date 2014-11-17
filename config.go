@@ -6,25 +6,25 @@ import (
 )
 
 type Config struct {
-	listenOn            string
-	endpoint            string
-	driver              string
-	dataSource          string
-	minSiteLength       int
-	siteSalt            string
-	createDefaultRules  bool
-	singleDomainUrlPath string // TODO: fix bad name
+	listenOn           string
+	endpoint           string
+	driver             string
+	dataSource         string
+	minSiteLength      int
+	siteSalt           string
+	createDefaultRules bool
+	adminUrlPathPrefix string
 }
 
 var DEFAULT_CONFIG = Config{
-	listenOn:            ":5103",
-	endpoint:            "localhost:5103",
-	driver:              "sqlite3",
-	dataSource:          ":memory:",
-	minSiteLength:       6,
-	siteSalt:            "",
-	createDefaultRules:  false,
-	singleDomainUrlPath: "/goslow",
+	listenOn:           ":5103",
+	endpoint:           "localhost:5103",
+	driver:             "sqlite3",
+	dataSource:         ":memory:",
+	minSiteLength:      6,
+	siteSalt:           "",
+	createDefaultRules: false,
+	adminUrlPathPrefix: "/goslow",
 }
 
 func NewConfigFromArgs() *Config {
@@ -43,7 +43,6 @@ func (config *Config) defineFlags() {
 	Used only in response texts, doesn't affect the listening address. E.g: goslow.link`)
 	flag.StringVar(&config.driver, "driver", DEFAULT_CONFIG.driver,
 		"database driver. Possible values: sqlite3, postgres.")
-	// TODO: is db a better name for cmd arg?
 	flag.StringVar(&config.dataSource, "data-source", DEFAULT_CONFIG.dataSource,
 		`data source name. E.g: postgres://user:password@localhost/dbname for postgres
 	or /path/to/sqlite3/db for sqlite3`)
@@ -53,14 +52,14 @@ func (config *Config) defineFlags() {
 		"random names generator salt. Keep it secret. E.g: kj8ioIxZ")
 	flag.BoolVar(&config.createDefaultRules, "create-default-rules", DEFAULT_CONFIG.createDefaultRules,
 		"Create default rules?")
-	flag.StringVar(&config.singleDomainUrlPath, "single-domain-url-path", DEFAULT_CONFIG.singleDomainUrlPath,
+	flag.StringVar(&config.adminUrlPathPrefix, "admin-url-path-prefix", DEFAULT_CONFIG.adminUrlPathPrefix,
 		`If not an empty string: run in single domain mode
-	and use url -listen-on/-single-domain-url-path for configuration`)
+	and use url http://LISTEN-ON/ADMIN-URL-PATH-PREFIX to configurate responses`)
 }
 
 func (config *Config) validate() {
-	if config.createDefaultRules && config.singleDomainUrlPath != "" {
-		log.Fatal("You can't use both --single-domain-url-path and --create-default-rules options")
+	if config.createDefaultRules && config.adminUrlPathPrefix != "" {
+		log.Fatal("You can't use both --admin-url-path-prefix and --create-default-rules options")
 	}
 
 }
