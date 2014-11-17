@@ -122,6 +122,19 @@ func checkZeroSite(t *testing.T, server *httptest.Server, testCase *TestCase) {
 		DEFAULT_BODY)
 }
 
+func TestTooLargeDelay(t *testing.T) {
+	runAll(t, checkTooLargeDelay, defaultTestCases)
+}
+
+func checkTooLargeDelay(t *testing.T, server *httptest.Server, testCase *TestCase) {
+	prefix := testCase.adminUrlPathPrefix
+	site := newSite(server, join(prefix, "/booya"), []byte("haha"))
+	resp := addRule(server, &Rule{Site: site, Delay: time.Duration(1000) * time.Second})
+	shouldHaveStatusCode(t, http.StatusBadRequest, resp)
+	resp = GET(server.URL, "/", site)
+	shouldHaveStatusCode(t, http.StatusNotFound, resp)
+}
+
 func TestRedefineBuiltinSites(t *testing.T) {
 	runAll(t, checkRedefineBuiltinSites, defaultTestCases)
 }
@@ -161,7 +174,6 @@ func TestRuleCreation(t *testing.T) {
 	runAll(t, checkRuleCreationTestCase, ruleCreationTestCases)
 }
 
-// TODO: refactor
 func checkRuleCreationTestCase(t *testing.T, server *httptest.Server, testCase *TestCase) {
 	prefix := testCase.adminUrlPathPrefix
 	site := ""
@@ -263,6 +275,7 @@ func toDuration(seconds float64) time.Duration {
 	return time.Duration(seconds*1000) * time.Millisecond
 }
 
+// TODO: rename, it returns a full domain, not a site
 func newSite(server *httptest.Server, path string, response []byte) string {
 	resp := POST(server.URL, fmt.Sprintf("%s?output=short&method=GET", path),
 		makeHost("create", TEST_ENDPOINT), response)

@@ -138,7 +138,6 @@ func (server *Server) isOptions(req *http.Request) bool {
 	return req.Method == "OPTIONS"
 }
 
-// TODO: check Android compatibility
 func allowCrossDomainRequests(w http.ResponseWriter, req *http.Request) {
 	header := w.Header()
 	header.Set("Access-Control-Allow-Origin", "*")
@@ -248,7 +247,6 @@ func (server *Server) makeRule(site string, req *http.Request) (*Rule, error) {
 	return rule, nil
 }
 
-// TODO: test a 99 seconds limit on delay
 func getRuleDelay(values url.Values) (time.Duration, error) {
 	_, contains := values[DELAY_PARAM]
 	if !contains {
@@ -471,7 +469,6 @@ func (server *Server) createRules(minSite, maxSite int) {
 func (server *Server) headersFor(site int) map[string]string {
 	_, isRedirect := REDIRECT_STATUSES[site]
 	if isRedirect {
-		// TODO: check that protocol-independent location works in Android
 		host := fmt.Sprintf("//%s", server.makeFullDomain(ZERO_DELAY_SITE))
 		return map[string]string{"Location": host}
 	}
