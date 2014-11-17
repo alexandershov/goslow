@@ -138,7 +138,7 @@ func (server *Server) isOptions(req *http.Request) bool {
 	return req.Method == "OPTIONS"
 }
 
-// TODO: check Safari/Android compatibility
+// TODO: check Android compatibility
 func allowCrossDomainRequests(w http.ResponseWriter, req *http.Request) {
 	header := w.Header()
 	header.Set("Access-Control-Allow-Origin", "*")
@@ -257,7 +257,7 @@ func getRuleDelay(values url.Values) (time.Duration, error) {
 	delay := values.Get(DELAY_PARAM)
 	delayInSeconds, err := strconv.ParseFloat(delay, 64)
 	if err != nil {
-		err = NewApiError(http.StatusBadRequest, "Oopsie daisy. Could not convert <%s> to float", delay)
+		err = NewApiError(http.StatusBadRequest, "Oopsie daisy. Could not convert delay <%s> to float", delay)
 		return time.Duration(0), err
 	}
 	if delayInSeconds > MAX_DELAY {
@@ -471,7 +471,7 @@ func (server *Server) createRules(minSite, maxSite int) {
 func (server *Server) headersFor(site int) map[string]string {
 	_, isRedirect := REDIRECT_STATUSES[site]
 	if isRedirect {
-		// TODO: check that protocol-independent location works in Safari/Android
+		// TODO: check that protocol-independent location works in Android
 		host := fmt.Sprintf("//%s", server.makeFullDomain(ZERO_DELAY_SITE))
 		return map[string]string{"Location": host}
 	}

@@ -16,6 +16,7 @@ import (
 )
 
 const (
+	ANY_DB_DRIVER = ""
 	TEST_ENDPOINT = "localhost:9999"
 	TEST_DB       = "goslow_test"
 )
@@ -38,35 +39,22 @@ type CheckFunc func(*testing.T, *httptest.Server, *TestCase)
 
 var (
 	defaultTestCases = TestCases{
-		NewTestCase(true, "", "sqlite3"),
-		NewTestCase(true, "", "postgres"),
+		NewTestCase(true, "", ANY_DB_DRIVER),
 	}
 
-	// TODO: remove duplication
 	ruleCreationTestCases = TestCases{
-		NewTestCase(true, "", "sqlite3"),
-		NewTestCase(true, "", "postgres"),
-
-		NewTestCase(false, "/goslow", "sqlite3"),
-		NewTestCase(false, "/goslow", "postgres"),
-
-		NewTestCase(false, "/goslow/", "sqlite3"),
-		NewTestCase(false, "/goslow/", "postgres"),
-
-		NewTestCase(false, "/te", "sqlite3"),
-		NewTestCase(false, "/te", "postgres"),
-
-		NewTestCase(false, "/te/", "sqlite3"),
-		NewTestCase(false, "/te/", "postgres"),
-
-		NewTestCase(false, "/composite/path", "sqlite3"),
-		NewTestCase(false, "/composite/path", "postgres"),
+		NewTestCase(true, "", ANY_DB_DRIVER),
+		NewTestCase(false, "/goslow", ANY_DB_DRIVER),
+		NewTestCase(false, "/goslow/", ANY_DB_DRIVER),
+		NewTestCase(false, "/te", ANY_DB_DRIVER),
+		NewTestCase(false, "/te/", ANY_DB_DRIVER),
+		NewTestCase(false, "/composite/path", ANY_DB_DRIVER),
 	}
 )
 
 func NewTestCase(createDefaultRules bool, adminUrlPathPrefix string, driver string) *TestCase {
 	dataSource, knownDriver := DATA_SOURCE[driver]
-	if !knownDriver {
+	if driver != ANY_DB_DRIVER && !knownDriver {
 		log.Fatalf("unknown driver: <%s>", driver)
 	}
 	return &TestCase{
@@ -77,13 +65,13 @@ func NewTestCase(createDefaultRules bool, adminUrlPathPrefix string, driver stri
 	}
 }
 
-func (testCase *TestCase) skippable() bool {
-	return testCase.driver == "postgres" && testing.Short()
+func TestZeroSite(t *testing.T) {
+	runAll(t, checkZeroSite, defaultTestCases)
 }
 
-func TestZeroSite(t *testing.T) {
-	for _, testCase := range runnable(defaultTestCases) {
-		run(t, checkZeroSite, testCase)
+func runAll(t *testing.T, checkFunc CheckFunc, testCases TestCases) {
+	for _, testCase := range runnable(all(testCases)) {
+		run(t, checkFunc, testCase)
 	}
 }
 
@@ -95,6 +83,25 @@ func runnable(testCases TestCases) TestCases {
 		}
 	}
 	return runnableTestCases
+}
+
+func all(testCases TestCases) TestCases {
+	allTestCases := make(TestCases, 0)
+	for _, testCase := range testCases {
+		if testCase.driver == ANY_DB_DRIVER {
+			sqlite3TestCase := NewTestCase(testCase.createDefaultRules, testCase.adminUrlPathPrefix, "sqlite3")
+			postgresTestCase := NewTestCase(testCase.createDefaultRules, testCase.adminUrlPathPrefix, "postgres")
+			allTestCases = append(allTestCases, sqlite3TestCase)
+			allTestCases = append(allTestCases, postgresTestCase)
+		} else {
+			allTestCases = append(allTestCases, testCase)
+		}
+	}
+	return allTestCases
+}
+
+func (testCase *TestCase) skippable() bool {
+	return testCase.driver == "postgres" && testing.Short()
 }
 
 func run(t *testing.T, checkFunc CheckFunc, testCase *TestCase) {
@@ -116,9 +123,7 @@ func checkZeroSite(t *testing.T, server *httptest.Server, testCase *TestCase) {
 }
 
 func TestRedefineBuiltinSites(t *testing.T) {
-	for _, testCase := range runnable(defaultTestCases) {
-		run(t, checkRedefineBuiltinSites, testCase)
-	}
+	runAll(t, checkRedefineBuiltinSites, defaultTestCases)
 }
 
 func checkRedefineBuiltinSites(t *testing.T, server *httptest.Server, testCase *TestCase) {
@@ -129,9 +134,7 @@ func checkRedefineBuiltinSites(t *testing.T, server *httptest.Server, testCase *
 }
 
 func TestDelay(t *testing.T) {
-	for _, testCase := range runnable(defaultTestCases) {
-		run(t, checkDelay, testCase)
-	}
+	runAll(t, checkDelay, defaultTestCases)
 }
 
 func checkDelay(t *testing.T, server *httptest.Server, testCase *TestCase) {
@@ -144,9 +147,7 @@ func checkDelay(t *testing.T, server *httptest.Server, testCase *TestCase) {
 }
 
 func TestStatus(t *testing.T) {
-	for _, testCase := range runnable(defaultTestCases) {
-		run(t, checkStatus, testCase)
-	}
+	runAll(t, checkStatus, defaultTestCases)
 }
 
 func checkStatus(t *testing.T, server *httptest.Server, testCase *TestCase) {
@@ -157,9 +158,7 @@ func checkStatus(t *testing.T, server *httptest.Server, testCase *TestCase) {
 }
 
 func TestRuleCreation(t *testing.T) {
-	for _, testCase := range runnable(ruleCreationTestCases) {
-		run(t, checkRuleCreationTestCase, testCase)
-	}
+	runAll(t, checkRuleCreationTestCase, ruleCreationTestCases)
 }
 
 // TODO: refactor
