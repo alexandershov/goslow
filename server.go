@@ -73,8 +73,11 @@ type ApiError struct {
 	StatusCode int
 }
 
-func NewApiError(message string, statusCode int) *ApiError {
-	return &ApiError{Message: message, StatusCode: statusCode}
+func NewApiError(statusCode int, format string, a ...interface{}) error {
+	return &ApiError{
+		Message:    fmt.Sprintf(format, a...),
+		StatusCode: statusCode,
+	}
 }
 
 func (error *ApiError) Error() string {
@@ -135,7 +138,7 @@ func (server *Server) isOptions(req *http.Request) bool {
 	return req.Method == "OPTIONS"
 }
 
-// TODO: check safari/android browser compatibility
+// TODO: check Safari/Android compatibility
 func allowCrossDomainRequests(w http.ResponseWriter, req *http.Request) {
 	header := w.Header()
 	header.Set("Access-Control-Allow-Origin", "*")
@@ -200,9 +203,9 @@ func (server *Server) makeSiteNameFrom(numbers []int) (string, error) {
 
 func generateUniqueNumbers() []int {
 	utc := time.Now().UTC()
-	totalSeconds := int(utc.Unix()) - GOSLOW_LAUNCH_TIMESTAMP // revisit this line in the year 2037
+	seconds := int(utc.Unix()) - GOSLOW_LAUNCH_TIMESTAMP // revisit this line in the year 2037
 	milliseconds := (utc.Nanosecond() / 1000000)
-	return []int{totalSeconds, milliseconds}
+	return []int{seconds, milliseconds}
 }
 
 func (server *Server) addRule(site string, req *http.Request) (*Rule, error) {
@@ -254,13 +257,11 @@ func getRuleDelay(values url.Values) (time.Duration, error) {
 	delay := values.Get(DELAY_PARAM)
 	delayInSeconds, err := strconv.ParseFloat(delay, 64)
 	if err != nil {
-		err = NewApiError(fmt.Sprintf("Oopsie daisy. Could not convert <%s> to float", delay),
-			http.StatusBadRequest)
+		err = NewApiError(http.StatusBadRequest, "Oopsie daisy. Could not convert <%s> to float", delay)
 		return time.Duration(0), err
 	}
 	if delayInSeconds > MAX_DELAY {
-		err = NewApiError(fmt.Sprintf("Oopsie daisy. Delay can't be greater then %d seconds", MAX_DELAY),
-			http.StatusBadRequest)
+		err = NewApiError(http.StatusBadRequest, "Oopsie daisy. Delay can't be greater then %d seconds", MAX_DELAY)
 		return time.Duration(0), err
 	}
 	return time.Duration(delayInSeconds*1000) * time.Millisecond, nil
@@ -377,7 +378,7 @@ func (server *Server) isAddRulePath(path string) bool {
 func (server *Server) handleAddRule(w http.ResponseWriter, req *http.Request) error {
 	site := server.getSite(req)
 	if isBuiltinSite(site) {
-		return NewApiError(fmt.Sprintf("Sorry, you can't change builtin sites"), http.StatusForbidden)
+		return NewApiError(http.StatusForbidden, "Sorry, you can't change builtin sites")
 	}
 	rule, err := server.addRule(site, req)
 	if err != nil {
@@ -470,7 +471,7 @@ func (server *Server) createRules(minSite, maxSite int) {
 func (server *Server) headersFor(site int) map[string]string {
 	_, isRedirect := REDIRECT_STATUSES[site]
 	if isRedirect {
-		// TODO: check that protocol-independent location is legal HTTP
+		// TODO: check that protocol-independent location works in Safari/Android
 		host := fmt.Sprintf("//%s", server.makeFullDomain(ZERO_DELAY_SITE))
 		return map[string]string{"Location": host}
 	}

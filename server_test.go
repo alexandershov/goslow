@@ -293,7 +293,7 @@ func addRule(server *httptest.Server, rule *Rule) *http.Response {
 		rule.Body)
 }
 
-// Wrapper around path.Join. Preserves trailing slash
+// Wrapper around path.Join. Preserves trailing slash.
 func join(elem ...string) string {
 	lastElem := elem[len(elem)-1]
 	shouldEndWithSlash := strings.HasSuffix(lastElem, "/")
