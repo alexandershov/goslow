@@ -1,8 +1,5 @@
 package main
 
-// TODO: think about using panic/recover for most errors
-// TODO: think about replacing isInSingleSiteMode with subclass
-
 import (
 	"errors"
 	"fmt"
@@ -168,12 +165,11 @@ func (server *Server) handleCreateSite(w http.ResponseWriter, req *http.Request)
 	if err != nil {
 		return err
 	}
-	// TODO: think about add/create naming dualism
 	rule, err := server.addRule(site, req)
 	if err != nil {
 		return err
 	}
-	if isShortOutput(req) { // TODO: fix bad name
+	if wantsShortOutput(req) {
 		server.showShortCreateSiteHelp(w, rule)
 	} else {
 		server.showLongCreateSiteHelp(w, rule)
@@ -290,7 +286,7 @@ func (server *Server) handleError(err error, w http.ResponseWriter) {
 	}
 }
 
-func isShortOutput(req *http.Request) bool {
+func wantsShortOutput(req *http.Request) bool {
 	values, err := url.ParseQuery(req.URL.RawQuery)
 	if err != nil {
 		return false
