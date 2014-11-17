@@ -6,7 +6,7 @@ import (
 
 var (
 	BANNER_TEMPLATE = template.Must(template.New("banner").Parse(
-		`=========================================
+		`===================== goslow ====================
 `))
 
 	CREATE_SITE_TEMPLATE = template.Must(template.New("create site").Parse(
@@ -14,14 +14,18 @@ var (
 
 Use admin-{{ .Domain }} for configuration.
 
-Example.
-If you want an endpoint {{ .Domain }}/xmas to respond to GET requests with "hohoho" and 3 seconds delay,
-then make a POST request:
-curl -X POST -d "hohoho" admin-{{ .Domain }}/xmas?delay=3&method=GET
-`))
+Example:
+Let's say you want to add an endpoint /christmas
+and you want it to respond to GET requests with "hohoho" and 3 seconds delay.
+Just make a POST request to your admin domain...
+curl -d "hohoho" "admin-{{ .Domain }}/christmas?delay=3&method=GET"
+
+... and you're done!
+
+If you have any questions, don't hesitate to ask: codumentary.com@gmail.com`))
 
 	ADD_RULE_TEMPLATE = template.Must(template.New("add rule").Parse(
-		`Endpoint {{ .Domain }}{{ .Path }} now responds to {{if .Method }}{{ .Method }}{{else}}any HTTP method{{ end }} {{ if .Delay }}with the delay {{ .Delay }}{{ else }}without delay{{end}}. Response is:
-{{ .StringBody }}
+		`Endpoint http://{{ .Domain }}{{ .Path }} responds to {{if .Method }}{{ .Method }}{{else}}any HTTP method{{ end }} {{ if .Delay }}with {{ .Delay }} delay{{ else }}without any delay{{end}}.
+Response is: {{ .StringBody }}
 `))
 )
