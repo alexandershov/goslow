@@ -1,5 +1,7 @@
 package main
 
+// TODO: look at different places where you can supply good error message
+
 import (
 	"errors"
 	"fmt"
@@ -45,7 +47,7 @@ var (
 
 const (
 	MAX_GENERATE_SITE_NAME_ATTEMPTS = 5
-	GOSLOW_EPOCH_START              = 1415975661 // TODO: update it before launch
+	GOSLOW_LAUNCH_TIMESTAMP         = 1415975661 // TODO: update it before launch
 )
 
 const (
@@ -133,7 +135,7 @@ func (server *Server) isOptions(req *http.Request) bool {
 	return req.Method == "OPTIONS"
 }
 
-// TODO: check crossbrowser compatibility
+// TODO: check safari/android browser compatibility
 func allowCrossDomainRequests(w http.ResponseWriter, req *http.Request) {
 	header := w.Header()
 	header.Set("Access-Control-Allow-Origin", "*")
@@ -198,9 +200,9 @@ func (server *Server) makeSiteNameFrom(numbers []int) (string, error) {
 
 func generateUniqueNumbers() []int {
 	utc := time.Now().UTC()
-	seconds := int(utc.Unix()) - GOSLOW_EPOCH_START     // revisit this line in the year 2037
-	milliseconds := (utc.Nanosecond() / 1000000) % 1000 // TODO: think about something better
-	return []int{seconds, milliseconds}
+	totalSeconds := int(utc.Unix()) - GOSLOW_LAUNCH_TIMESTAMP // revisit this line in the year 2037
+	milliseconds := (utc.Nanosecond() / 1000000)
+	return []int{totalSeconds, milliseconds}
 }
 
 func (server *Server) addRule(site string, req *http.Request) (*Rule, error) {
@@ -243,16 +245,22 @@ func (server *Server) makeRule(site string, req *http.Request) (*Rule, error) {
 	return rule, nil
 }
 
-// TODO: return human readable error, not default strconv.ParseFloat error
-// look at different places where you can supply good error message
-// TODO: set a 99 seconds limit on delay
+// TODO: test a 99 seconds limit on delay
 func getRuleDelay(values url.Values) (time.Duration, error) {
 	_, contains := values[DELAY_PARAM]
 	if !contains {
 		return DEFAULT_DELAY, nil
 	}
-	delayInSeconds, err := strconv.ParseFloat(values.Get(DELAY_PARAM), 64)
+	delay := values.Get(DELAY_PARAM)
+	delayInSeconds, err := strconv.ParseFloat(delay, 64)
 	if err != nil {
+		err = NewApiError(fmt.Sprintf("Oopsie daisy. Could not convert <%s> to float", delay),
+			http.StatusBadRequest)
+		return time.Duration(0), err
+	}
+	if delayInSeconds > MAX_DELAY {
+		err = NewApiError(fmt.Sprintf("Oopsie daisy. Delay can't be greater then %d seconds", MAX_DELAY),
+			http.StatusBadRequest)
 		return time.Duration(0), err
 	}
 	return time.Duration(delayInSeconds*1000) * time.Millisecond, nil
