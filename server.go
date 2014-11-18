@@ -68,22 +68,6 @@ type TemplateData struct {
 	StringBody string
 }
 
-type ApiError struct {
-	Message    string
-	StatusCode int
-}
-
-func NewApiError(statusCode int, format string, a ...interface{}) error {
-	return &ApiError{
-		Message:    fmt.Sprintf(format, a...),
-		StatusCode: statusCode,
-	}
-}
-
-func (error *ApiError) Error() string {
-	return error.Message
-}
-
 func NewServer(config *Config) *Server {
 	storage, err := NewStorage(config.driver, config.dataSource)
 	if err != nil {
@@ -255,12 +239,10 @@ func getRuleDelay(values url.Values) (time.Duration, error) {
 	delay := values.Get(DELAY_PARAM)
 	delayInSeconds, err := strconv.ParseFloat(delay, 64)
 	if err != nil {
-		err = NewApiError(http.StatusBadRequest, "Oopsie daisy! Could not convert delay <%s> to float", delay)
-		return time.Duration(0), err
+		return time.Duration(0), InvalidDelayError(delay)
 	}
 	if delayInSeconds > MAX_DELAY {
-		err = NewApiError(http.StatusBadRequest, "Oopsie daisy! Delay can't be greater then %d seconds", MAX_DELAY)
-		return time.Duration(0), err
+		return time.Duration(0), DelayIsTooBigError(delayInSeconds)
 	}
 	return time.Duration(delayInSeconds*1000) * time.Millisecond, nil
 }
@@ -376,14 +358,14 @@ func (server *Server) isAddRulePath(path string) bool {
 func (server *Server) handleAddRule(w http.ResponseWriter, req *http.Request) error {
 	site := server.getSite(req)
 	if isBuiltinSite(site) {
-		return NewApiError(http.StatusForbidden, "Oopsie daisy! You can't change builtin sites")
+		return ChangeBuiltinSiteError()
 	}
 	contains, err := server.storage.ContainsSite(site)
 	if err != nil {
 		return err
 	}
 	if !contains {
-		return NewApiError(http.StatusNotFound, "Oopsie daisy! Site <%s> doesn't exist", site)
+		return UnknownSiteError(site)
 	}
 	rule, err := server.addRule(site, req)
 	if err != nil {
