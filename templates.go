@@ -26,6 +26,6 @@ If you have any questions, don't hesitate to ask: codumentary.com@gmail.com`))
 	ADD_RULE_TEMPLATE = template.Must(template.New("add rule").Parse(
 		`Hooray!
 Endpoint http://{{ .Domain }}{{ .Path }} responds to {{if .Method }}{{ .Method }}{{else}}any HTTP method{{ end }} {{ if .Delay }}with {{ .Delay }} delay{{ else }}without any delay{{end}}.
-Response is: {{ .StringBody }}
+Response is: {{ if .StringBody }}{{ .StringBody }}{{ else }}<EMPTY>{{ end }}
 `))
 )
