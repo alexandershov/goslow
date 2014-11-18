@@ -342,7 +342,6 @@ func (server *Server) isAddRule(req *http.Request) bool {
 	return strings.HasPrefix(getSubdomain(req.Host), ADD_RULE_SUBDOMAIN_PREFIX)
 }
 
-// TODO: rewrite
 func (server *Server) isAddRulePath(path string) bool {
 	adminPath := server.config.adminUrlPathPrefix
 	if !strings.HasPrefix(path, adminPath) {

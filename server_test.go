@@ -185,6 +185,7 @@ func TestRuleCreation(t *testing.T) {
 	runAll(t, checkRuleCreationTestCase, ruleCreationTestCases)
 }
 
+// TODO: refactor
 func checkRuleCreationTestCase(t *testing.T, server *httptest.Server, testCase *TestCase) {
 	prefix := testCase.adminUrlPathPrefix
 	site := ""
