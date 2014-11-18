@@ -6,7 +6,7 @@ external APIs. If you can easily configure API server domain name, then goslow w
 Let's say you're developing an application against the Facebook graph API and
 you want to see what happens when the endpoint *graph.facebook.com/me* starts to respond in 10 seconds.
 
-Just configure your app to make the requests to *10.goslow.link* instead of *graph.facebook.com*
+Just configure your app to make requests to *10.goslow.link* instead of *graph.facebook.com*
 and you're set:
 
 ```shell
@@ -15,8 +15,8 @@ time curl 10.goslow.link/me
 10.023 total
 ```
 
-Well, almost set, because we've got a canned response **{"goslow": "response"}**.
-What we really want to get is a standard graph API response: **{"name": "zuck", "gender": "male"}**.  
+Well, almost set, because you've got a canned response **{"goslow": "response"}**.
+You probably wanted to get the usual graph API response: **{"name": "zuck", "gender": "male"}**.  
 No worries, we'll get to that later.
 
 By the way, different endpoints and POST requests also work:
@@ -38,7 +38,7 @@ time curl 6.goslow.link/me
 Need to simulate some serious delay? Use *99.goslow.link*:
 ```shell
 time curl 99.goslow.link/me
-{"goslow": "link"}
+{"goslow": "response"}
 99.104 total
 ```
 
@@ -57,6 +57,10 @@ time curl 500.goslow.link/me
 
 
 ## Not-so-quick start
+> No worries, we'll get to that later.
+
+Remember that bit? Well, it's later time!
+
 Let's return to the Facebook graph API example.
 Let's say you're using the endpoint *graph.facebook.com/me* and you want to:
 1. Slow it down by 5 seconds
@@ -65,52 +69,56 @@ Let's say you're using the endpoint *graph.facebook.com/me* and you want to:
 Just make a POST request to *create.goslow.link/me?delay=5* and you're set.
 ```shell
 curl -d '{"name": "zuck", "gender": "male"}' 'create.goslow.link/me?delay=5'
+Hooray!
+Endpoint http://5wx55yijr.goslow.link/me responds to any HTTP method with 5s delay.
+Response is: {"name": "zuck", "gender": "male"}
 
-Endpoint k6zzki4xj.goslow.link/me/ now responds to any HTTP method with the delay 5s. Response is:
-{"id": 4, "username": "Zuck"}
-
-Your goslow domain is k6zzki4xj.goslow.link
+Your personal goslow domain is 5wx55yijr.goslow.link
 ...
 ```
 
-Now, what's the deal with the "*your goslow domain k6zzki4xj.goslow.link*"?
+Now, what's the deal with the "*your personal goslow domain is 5wx55yijr.goslow.link*"? Well, now you the domain *5wx55yijr.goslow.link* is all yours and you can add different endpoints to it.
 
-In the real world your goslow domain will be different
-from the *k6zzki4xj.goslow.link*. (names are randomly generated) For the sake of example let's assume that randomly
-generated domain name is *k6zzki4xj.goslow.link*
+Quick aside:
+when you do a POST request to *create.goslow.link* your personal goslow domain will be a little different
+from the *5wx55yijr.goslow.link*. Domain names are randomly generated. For the sake of example let's pretent that the randomly
+generated domain name was *5wx55yijr.goslow.link*.
+End of quick aside.
 
 Now you can send requests to your domain:
 ```shell
-time curl k6zzki4xj.goslow.link/users
-'{"my": "response"}'
+time curl 5wx55yijr.goslow.link/me
+{"name": "zuck", "gender": "male"}
 5.382 total
 ```
 
-And configure it with POST requests to *admin-k6zzki4xj.goslow.link*
-Let's make endpoint *k6zzki4xj.goslow.link/another/* to respond with **{"another": "response"}**
-and 3 seconds delay:
+You can add new endpoints by POSTing to *admin-5wx55yijr.goslow.link*  
+Let's make the endpoint *5wx55yijr.goslow.link/another/* to respond to POST requests with **{"another": "response"}**
+and 3.4 seconds delay:
 ```shell
-curl -d '{"another": "response"}' 'admin-k6zzki4xj.goslow.link/another/?delay=3'
-dk8kjs.goslow.link/another/ will now respond with 3 seconds delay.
-Response is '{"another": "response"}'
+curl -d '{"another": "response"}' 'admin-5wx55yijr.goslow.link/another/?delay=3.4'
+Hooray!
+Endpoint http://5wx55yijr.goslow.link/another/ responds to POST with 3.4s delay.
+Response is: {"another": "response"}
 ```
 
-Now you have two urls responding with different JSON and delay.
+Now you have two urls sending different responses with different delays.
 ```shell
-time curl k6zzki4xj.goslow.link/another/
+time curl -d 'any payload' 5wx55yijr.goslow.link/another/
 '{"another": "response"}'
-3.182 total
+3.482 total
 ```
 
 ```shell
-time curl k6zzki4xj.goslow.link/users
-'{"my": "response"}'
+time curl 5wx55yijr.goslow.link/me
+{"name": "zuck", "gender": "male"}
 5.028 total
 ```
 
+Sky is the limit.
+
 ## Slow start
-If you think that relying on unprotected-by-passwords third-party-domains is a
-bad idea, then you're absolutely right.
+If you think that having unprotected-by-passwords third-party-domains storing-your-data is not a million dollar idea, then you're absolutely right.
 
 You can install goslow locally. You'll need the [golang](https://golang.org/) compiler to build it.
 
@@ -130,42 +138,35 @@ listening on :5103
 ```
 
 Local install of goslow runs in a single domain mode by default
-since nobody wants to deal with dynamically generated subdomain names on a local machine.
-You can configure goslow with the POST requests to /goslow/.
+since nobody wants to deal with the dynamically generated subdomain names on a localhost.
+You can configure goslow with the POST requests to /goslow/ (this special endpoint can be changed via -admin-url-path-prefix option)
 ```shell
 curl -d '{"local": "response"}' 'localhost:5103/goslow/feed?delay=4.3'
-/feed is now responding with 4.3 seconds delay.
-Response is {"local": "response"}
-```
-
-You can also proxy goslow requests directly to your API with extra delay:
-```shell
-curl -d 'http://your.api' 'localhost:5103/goslow/?proxy&delay=10'
+Hooray!
+Endpoint http://localhost:5103/feed responds to any HTTP method with 4.3s delay.
+Response is: {"local": "response"}
 ```
 
 
-```shell
-time curl localhost:5103/some/url
-# proxies to http://your.api/some/url
-10.123 total
-```
-
-By default goslow stores data in memory. This means that any
+By default goslow server stores all data in memory. This means that any
 configuration change you make will be lost after restart.
-You need to specify *--driver* and *--data-source* options to use a persistend storage.
+If you want to use a persistent storage, then you need to specify *--driver* and *--data-source* options.
 
 Goslow supports sqlite3:
 ```shell
-sqlite3 /path/to/sqlite3/db/file < goslow/sql/schema.sql
 bin/goslow --driver sqlite3 --data-source /path/to/sqlite3/db/file
 ```
 
 and postgres:
 ```shell
-psql -U user dbname < goslow/sql/schema.sql
 bin/goslow --driver postgres --data-source postgres://user@host/dbname
 # data source prefix 'postgres://' is required
 ```
+
+## Get in touch
+Got a question or a suggestion?
+I'd love to hear from you: [codumentary.com@gmail.com](mailto:codumentary.com@gmail.com)
+
 
 ## Contributing
 Contributing to goslow is easy.  
@@ -173,14 +174,12 @@ First, you need to sign a contributor agreement.
 Second, your boss needs to sign a waiver that she's okay with you
 contributing to goslow.
 
-Just kidding.  
+Just kidding.
+
 Create pull requests, open issues, send emails with patches/tarballs/links-to-pastebin
-to [codumentary.com@gmail.com](mailto:codumentary.com@gmail.com) Whatever makes you happy.
+to [codumentary.com@gmail.com](mailto:codumentary.com@gmail.com). Whatever makes you happy.
 Any form of contribution is welcome.
 
-## Get in touch:
-Got a question or an idea?
-I'd love to hear from you: [codumentary.com@gmail.com](mailto:codumentary.com@gmail.com)
 
 ## License
 MIT
