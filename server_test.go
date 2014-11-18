@@ -146,6 +146,17 @@ func checkRedefineBuiltinSites(t *testing.T, server *httptest.Server, testCase *
 	}
 }
 
+func TestRedefineNonExistentSite(t *testing.T) {
+	runAll(t, checkRedefineNonExistentSite, defaultTestCases)
+}
+
+func checkRedefineNonExistentSite(t *testing.T, server *httptest.Server, testCase *TestCase) {
+	for _, site := range []string{"", "ha", "admin-500"} {
+		resp := addRule(server, &Rule{Site: site})
+		shouldHaveStatusCode(t, http.StatusNotFound, resp)
+	}
+}
+
 func TestDelay(t *testing.T) {
 	runAll(t, checkDelay, defaultTestCases)
 }

@@ -255,11 +255,11 @@ func getRuleDelay(values url.Values) (time.Duration, error) {
 	delay := values.Get(DELAY_PARAM)
 	delayInSeconds, err := strconv.ParseFloat(delay, 64)
 	if err != nil {
-		err = NewApiError(http.StatusBadRequest, "Oopsie daisy. Could not convert delay <%s> to float", delay)
+		err = NewApiError(http.StatusBadRequest, "Oopsie daisy! Could not convert delay <%s> to float", delay)
 		return time.Duration(0), err
 	}
 	if delayInSeconds > MAX_DELAY {
-		err = NewApiError(http.StatusBadRequest, "Oopsie daisy. Delay can't be greater then %d seconds", MAX_DELAY)
+		err = NewApiError(http.StatusBadRequest, "Oopsie daisy! Delay can't be greater then %d seconds", MAX_DELAY)
 		return time.Duration(0), err
 	}
 	return time.Duration(delayInSeconds*1000) * time.Millisecond, nil
@@ -362,21 +362,28 @@ func (server *Server) isAddRule(req *http.Request) bool {
 
 // TODO: rewrite
 func (server *Server) isAddRulePath(path string) bool {
-	addRulePath := server.config.adminUrlPathPrefix
-	if !strings.HasPrefix(path, addRulePath) {
+	adminPath := server.config.adminUrlPathPrefix
+	if !strings.HasPrefix(path, adminPath) {
 		return false
 	}
-	if strings.HasSuffix(addRulePath, "/") {
+	if strings.HasSuffix(adminPath, "/") {
 		return true
 	}
-	suffix := strings.TrimPrefix(path, addRulePath)
+	suffix := strings.TrimPrefix(path, adminPath)
 	return suffix == "" || suffix[0] == '?' || suffix[0] == '/'
 }
 
 func (server *Server) handleAddRule(w http.ResponseWriter, req *http.Request) error {
 	site := server.getSite(req)
 	if isBuiltinSite(site) {
-		return NewApiError(http.StatusForbidden, "Sorry, you can't change builtin sites")
+		return NewApiError(http.StatusForbidden, "Oopsie daisy! You can't change builtin sites")
+	}
+	contains, err := server.storage.ContainsSite(site)
+	if err != nil {
+		return err
+	}
+	if !contains {
+		return NewApiError(http.StatusNotFound, "Oopsie daisy! Site <%s> doesn't exist", site)
 	}
 	rule, err := server.addRule(site, req)
 	if err != nil {
