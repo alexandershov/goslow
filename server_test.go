@@ -189,28 +189,31 @@ func TestRuleCreation(t *testing.T) {
 // TODO: refactor
 func checkRuleCreationTestCase(t *testing.T, server *httptest.Server, testCase *TestCase) {
 	prefix := testCase.adminUrlPathPrefix
-	domain := TEST_ENDPOINT
-	site := ""
+	domain, site := TEST_ENDPOINT, ""
+	root_resp := []byte("haha")
+	test_resp := []byte("hop")
+	test_post_resp := []byte("for POST")
+	empty_payload := []byte("")
 	if prefix == "" {
-		domain = newDomain(server, join(prefix, "/"), []byte("haha"))
+		domain = newDomain(server, join(prefix, "/"), root_resp)
 		site = getSite(domain)
 	} else {
-		resp := addRule(server, &Rule{Path: join(prefix, "/"), Body: []byte("haha")})
+		resp := addRule(server, &Rule{Path: join(prefix, "/"), Body: root_resp})
 		shouldHaveStatusCode(t, http.StatusOK, resp)
 	}
-	bytesShouldBeEqual(t, readBody(GET(server.URL, "/", domain)), []byte("haha"))
-	resp := addRule(server, &Rule{Site: site, Path: join(prefix, "/test"), Body: []byte("hop"), Method: "GET"})
+	bytesShouldBeEqual(t, readBody(GET(server.URL, "/", domain)), root_resp)
+	resp := addRule(server, &Rule{Site: site, Path: join(prefix, "/test"), Body: test_resp, Method: "GET"})
 	shouldHaveStatusCode(t, http.StatusOK, resp)
 
-	bytesShouldBeEqual(t, readBody(GET(server.URL, "/test", domain)), []byte("hop"))
+	bytesShouldBeEqual(t, readBody(GET(server.URL, "/test", domain)), test_resp)
 	resp = POST(server.URL, "/test", domain, []byte(""))
 	intShouldBeEqual(t, 404, resp.StatusCode)
-	resp = addRule(server, &Rule{Site: site, Path: join(prefix, "/test"), Body: []byte("for POST"), Method: "POST",
+	resp = addRule(server, &Rule{Site: site, Path: join(prefix, "/test"), Body: test_post_resp, Method: "POST",
 		Delay: time.Duration(100) * time.Millisecond})
 	shouldHaveStatusCode(t, http.StatusOK, resp)
-	bytesShouldBeEqual(t, readBody(GET(server.URL, "/test", domain)), []byte("hop"))
-	bytesShouldBeEqual(t, readBody(POST(server.URL, "/test", domain, []byte(""))), []byte("for POST"))
-	shouldRespondIn(t, createPOST(server.URL, "/test", domain, []byte("")), 0.1, 0.15)
+	bytesShouldBeEqual(t, readBody(GET(server.URL, "/test", domain)), test_resp)
+	bytesShouldBeEqual(t, readBody(POST(server.URL, "/test", domain, []byte(""))), test_post_resp)
+	shouldRespondIn(t, createPOST(server.URL, "/test", domain, empty_payload), 0.1, 0.15)
 }
 
 func newSubDomainServer(testCase *TestCase) *Server {
@@ -290,7 +293,6 @@ func toDuration(seconds float64) time.Duration {
 	return time.Duration(seconds*1000) * time.Millisecond
 }
 
-// TODO: rename, it returns a full domain, not a site
 func newDomain(server *httptest.Server, path string, response []byte) string {
 	resp := POST(server.URL, fmt.Sprintf("%s?output=short&method=GET", path),
 		makeHost("create", TEST_ENDPOINT), response)
