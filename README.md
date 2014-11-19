@@ -4,7 +4,7 @@ external APIs. If you can easily configure API server domain name, then goslow w
 
 ## Quick start
 Let's say you're developing an application against the Facebook graph API and
-you want to see what happens when the endpoint *graph.facebook.com/me* starts to respond in 10 seconds.
+you want to know what will happen when the endpoint *graph.facebook.com/me* responds in 10 seconds.
 
 Just configure your app to make requests to *10.goslow.link* instead of *graph.facebook.com*
 and you're set:
@@ -12,7 +12,7 @@ and you're set:
 ```shell
 time curl 10.goslow.link/me
 {"goslow": "response"}
-10.023 total
+10.423 total
 ```
 
 Well, almost set, because you've got a canned response **{"goslow": "response"}**.
@@ -23,7 +23,7 @@ By the way, different endpoints and POST requests also work:
 ```shell
 time curl -X POST -d 'your payload' '10.goslow.link/me/feed?message="test"'
 {"goslow": "response"}
-10.123 total
+10.223 total
 ```
 
 Need to simulate a 6 seconds delay? Just use *6.goslow.link* instead of *10.goslow.link*
@@ -32,14 +32,14 @@ Need to simulate a 6 seconds delay? Just use *6.goslow.link* instead of *10.gosl
 ```shell
 time curl 6.goslow.link/me
 {"goslow": "response"}
-6.128 total
+6.178 total
 ```
 
 Need to simulate some serious delay? Use *99.goslow.link*:
 ```shell
 time curl 99.goslow.link/me
 {"goslow": "response"}
-99.104 total
+99.204 total
 ```
 
 Need to simulate a 500 seconds delay? Use *500.goslow.link*, right?
@@ -48,13 +48,18 @@ Nope. Domains *100.goslow.link*, *101.goslow.link*, ..., *599.goslow.link* respo
 HTTP status code 100, 101, ..., 599 without any delay:
 
 ```shell
-time curl 500.goslow.link/me
-{"goslow": "response"}%
-0.052 total
+time curl -w "%{http_code}" 500.goslow.link/me
+{"goslow": "response"}500
+0.152 total
 ```
 
-*301.goslow.link* and *302.goslow.link* redirect to *0.goslow.link*
+*301.goslow.link* and *302.goslow.link* redirect to *0.goslow.link*:
 
+```shell
+time curl -w "%{redirect_url}" 302.goslow.link/me
+{"goslow": "response"}HTTP://0.goslow.link
+0.107 total
+```
 
 ## Not-so-quick start
 > No worries, we'll get to that later.
@@ -63,10 +68,10 @@ Remember that bit? Well, it's later time!
 
 Let's return to the Facebook graph API example.
 Let's say you're using the endpoint *graph.facebook.com/me* and you want to:
-1. Slow it down by 5 seconds
+1. Slow it down by 5 seconds.
 2. Get **{"name": "zuck", "gender": "male"}** in response.
 
-Just make a POST request to *create.goslow.link/me?delay=5* and you're set.
+Just make a POST request to *create.goslow.link/me?delay=5* with the payload **{"name": "zuck", "gender": "male"}** and you're set.
 ```shell
 curl -d '{"name": "zuck", "gender": "male"}' 'create.goslow.link/me?delay=5'
 Hooray!
@@ -76,27 +81,28 @@ Response is: {"name": "zuck", "gender": "male"}
 Your personal goslow domain is 5wx55yijr.goslow.link
 ...
 ```
+Awesome, you're *really* set this time:
 
-Now, what's the deal with the "*your personal goslow domain is 5wx55yijr.goslow.link*"? Well, now you the domain *5wx55yijr.goslow.link* is all yours and you can add different endpoints to it.
-
-Quick aside:
-when you do a POST request to *create.goslow.link* your personal goslow domain will be a little different
-from the *5wx55yijr.goslow.link*. Domain names are randomly generated. For the sake of example let's pretent that the randomly
-generated domain name was *5wx55yijr.goslow.link*.
-End of quick aside.
-
-Now you can send requests to your domain:
 ```shell
 time curl 5wx55yijr.goslow.link/me
 {"name": "zuck", "gender": "male"}
 5.382 total
 ```
 
+Now, what's the deal with the "*your personal goslow domain is 5wx55yijr.goslow.link*"? Well, the domain *5wx55yijr.goslow.link* is all yours and you can add different endpoints to it.
+
+Quick aside:
+when *you* POST to *create.goslow.link* your personal goslow domain will be a little different
+from the *5wx55yijr.goslow.link*. Domain names are randomly generated. For the sake of example let's pretend that the randomly
+generated domain name was *5wx55yijr.goslow.link*.
+End of quick aside.
+
+
 You can add new endpoints by POSTing to *admin-5wx55yijr.goslow.link*  
 Let's make the endpoint *5wx55yijr.goslow.link/another/* to respond to POST requests with **{"another": "response"}**
 and 3.4 seconds delay:
 ```shell
-curl -d '{"another": "response"}' 'admin-5wx55yijr.goslow.link/another/?delay=3.4'
+curl -d '{"another": "response"}' 'admin-5wx55yijr.goslow.link/another/?delay=3.4&method=POST'
 Hooray!
 Endpoint http://5wx55yijr.goslow.link/another/ responds to POST with 3.4s delay.
 Response is: {"another": "response"}
@@ -115,12 +121,21 @@ time curl 5wx55yijr.goslow.link/me
 5.028 total
 ```
 
-Sky is the limit.
+The sky's the limit.
+
+Worried whether slow javascript CDN will bring your app down? Goslow've got you covered:
+```shell
+curl ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js | curl -d @- "admin-5wx55yijr.goslow.link/ajax/libs/jquery/2.1.1/jquery.min.js?delay=20"
+
+Hooray!
+Endpoint http://5wx55yijr.goslow.link/ajax/libs/jquery/2.1.1/jquery.min.js responds to any HTTP method with 20s delay.
+Response is: /*! jQuery v2.1.1 | (c) 2005, 2014 jQuery Foundation, Inc. | jquery.org/licen...
+```
 
 ## Slow start
-If you think that having unprotected-by-passwords third-party-domains storing-your-data is not a million dollar idea, then you're absolutely right.
+If you think that storing your data on unprotected-by-passwords-third-party-domains is not a great idea, then you're absolutely right.
 
-You can install goslow locally. You'll need the [golang](https://golang.org/) compiler to build it.
+The solution is to install goslow locally. You can download binary for your platform or, if you're feeling adventurous, you can compile goslow from the source. You'll need the [golang](https://golang.org/) compiler to build it.
 
 ```shell
 # install dependencies
@@ -137,9 +152,9 @@ bin/goslow
 listening on :5103
 ```
 
-Local install of goslow runs in a single domain mode by default
-since nobody wants to deal with the dynamically generated subdomain names on a localhost.
-You can configure goslow with the POST requests to /goslow/ (this special endpoint can be changed via -admin-url-path-prefix option)
+By default local version of goslow runs in a single domain mode
+because nobody wants to deal with the dynamically generated subdomain names on a localhost.
+You can configure goslow with the POST requests to /goslow/ (this special endpoint can be changed via the -admin-url-path-prefix option)
 ```shell
 curl -d '{"local": "response"}' 'localhost:5103/goslow/feed?delay=4.3'
 Hooray!
@@ -148,9 +163,8 @@ Response is: {"local": "response"}
 ```
 
 
-By default goslow server stores all data in memory. This means that any
-configuration change you make will be lost after restart.
-If you want to use a persistent storage, then you need to specify *--driver* and *--data-source* options.
+By default goslow server stores all data in memory. This means that every endpoint you add will be lost after restart.
+If you want to use a persistent storage, you'll need to specify *--driver* and *--data-source* options.
 
 Goslow supports sqlite3:
 ```shell
