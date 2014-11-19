@@ -3,7 +3,6 @@ package main
 // TODO: look at different places where you can supply good error message
 
 import (
-	"errors"
 	"fmt"
 	"github.com/speps/go-hashids"
 	"io/ioutil"
@@ -37,8 +36,6 @@ const (
 	ADD_RULE_SUBDOMAIN_PREFIX = "admin-"
 )
 
-const CANT_CREATE_SITE_ERROR = `Can't create.
-Try again in a few seconds or contact codumentary.com@gmail.com for help`
 
 var (
 	REDIRECT_STATUSES = map[int]bool{301: true, 302: true}
@@ -157,7 +154,7 @@ func (server *Server) handleCreateSite(w http.ResponseWriter, req *http.Request)
 	if err != nil {
 		return err
 	}
-	if wantsShortOutput(req) {
+	if wantsShortResponse(req) {
 		server.showShortCreateSiteHelp(w, rule)
 	} else {
 		server.showLongCreateSiteHelp(w, rule)
@@ -177,7 +174,7 @@ func (server *Server) generateUniqueSiteName(numAttempts uint) (string, error) {
 		}
 		time.Sleep(getRandomDurationBetween(10, 20)) // milliseconds
 	}
-	return "", errors.New(CANT_CREATE_SITE_ERROR)
+	return "", CantCreateSiteError()
 }
 
 func (server *Server) makeSiteNameFrom(numbers []int) (string, error) {
@@ -275,7 +272,7 @@ func (server *Server) handleError(err error, w http.ResponseWriter) {
 	}
 }
 
-func wantsShortOutput(req *http.Request) bool {
+func wantsShortResponse(req *http.Request) bool {
 	values, err := url.ParseQuery(req.URL.RawQuery)
 	if err != nil {
 		return false
@@ -359,12 +356,9 @@ func (server *Server) handleAddRule(w http.ResponseWriter, req *http.Request) er
 	if isBuiltinSite(site) {
 		return ChangeBuiltinSiteError()
 	}
-	contains, err := server.storage.ContainsSite(site)
+	err := server.errorIfSiteExists(site)
 	if err != nil {
 		return err
-	}
-	if !contains {
-		return UnknownSiteError(site)
 	}
 	rule, err := server.addRule(site, req)
 	if err != nil {
@@ -396,6 +390,17 @@ func isDefaultRuleSite(site string) bool {
 		return false
 	}
 	return i <= MAX_STATUS_CODE
+}
+
+func (server *Server) errorIfSiteExists(site string) error {
+	exists, err := server.storage.ContainsSite(site)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return UnknownSiteError(site)
+	}
+	return nil
 }
 
 func (server *Server) getRulePath(req *http.Request) string {
