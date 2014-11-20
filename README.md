@@ -30,7 +30,7 @@ Need to simulate a 6 seconds delay? Just use *6.goslow.link* instead of *10.gosl
 
 
 ```shell
-time curl 6.goslow.link/me
+time curl 6.goslow.link/any-endpoint-works
 {"goslow": "response"}
 6.178 total
 ```
@@ -66,7 +66,7 @@ time curl -w "%{redirect_url}" 302.goslow.link/me
 
 Remember that bit? Well, it's later time!
 
-Let's return to the Facebook graph API example.
+Back to the Facebook graph API example.
 Let's say you're using the endpoint *graph.facebook.com/me* and you want to:
 1. Slow it down by 5 seconds.
 2. Get **{"name": "zuck", "gender": "male"}** in response.
@@ -135,26 +135,26 @@ Response is: /*! jQuery v2.1.1 | (c) 2005, 2014 jQuery Foundation, Inc. | jquery
 ## Slow start
 If you think that storing your data on unprotected-by-passwords-third-party-domains is not a great idea, then you're absolutely right.
 
-The solution is to install goslow locally. You can download binary for your platform or, if you're feeling adventurous, you can compile goslow from the source. You'll need the [golang](https://golang.org/) compiler to build it.
+The solution is to install goslow locally.
 
+### Installation
+[Download](github.com/alexandershov/goslow/releases) a precompiled binary for your operating system.
+
+If you're feeling adventurous, you can [build goslow from source.](github.com/alexandershov/goslow/Build.md)
+
+### Usage
+
+Start server:
 ```shell
-# install dependencies
-go get github.com/alexandershov/goslow \
-github.com/lib/pq                      \
-github.com/mattn/go-sqlite3            \
-github.com/speps/go-hashids
-
-# build
-go install github.com/alexandershov/goslow
-
-# run
-bin/goslow
-listening on :5103
+./goslow # or goslow.exe if you're on Windows
+# listening on localhost:5103
 ```
 
-By default local version of goslow runs in a single domain mode
+By default goslow runs in a single domain mode
 because nobody wants to deal with the dynamically generated subdomain names on a localhost.
-You can configure goslow with the POST requests to /goslow/ (this special endpoint can be changed via the -admin-url-path-prefix option)
+
+You can configure goslow with the POST requests to the endpoint /goslow  
+Let's add the endpoint */feed*:
 ```shell
 curl -d '{"local": "response"}' 'localhost:5103/goslow/feed?delay=4.3'
 Hooray!
@@ -163,7 +163,7 @@ Response is: {"local": "response"}
 ```
 
 
-By default goslow server stores all data in memory. This means that every endpoint you add will be lost after restart.
+By default goslow stores all data in memory. This means that any endpoint you add will be lost after restart.
 If you want to use a persistent storage, you'll need to specify *--driver* and *--data-source* options.
 
 Goslow supports sqlite3:
@@ -174,7 +174,7 @@ bin/goslow --driver sqlite3 --data-source /path/to/sqlite3/db/file
 and postgres:
 ```shell
 bin/goslow --driver postgres --data-source postgres://user@host/dbname
-# data source prefix 'postgres://' is required
+# prefix 'postgres://' is required
 ```
 
 ## Get in touch
