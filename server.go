@@ -267,7 +267,7 @@ func (server *Server) handleError(err error, w http.ResponseWriter) {
 	if isApiError {
 		http.Error(w, apiError.Error(), apiError.StatusCode)
 	} else {
-		message := fmt.Sprintf("Internal error: %s. For real", err)
+		message := fmt.Sprintf("Internal error: %s.", err)
 		http.Error(w, message, http.StatusInternalServerError)
 	}
 }
@@ -324,7 +324,7 @@ func (server *Server) respondFromRule(w http.ResponseWriter, req *http.Request) 
 	if found {
 		applyRule(rule, w)
 	} else {
-		http.Error(w, "No rule. For real.", http.StatusNotFound)
+		http.Error(w, "Oopsie daisy! This endpoint isn't configured yet.", http.StatusNotFound)
 	}
 	return nil
 }
