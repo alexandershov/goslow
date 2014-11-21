@@ -138,9 +138,9 @@ If you think that storing your data on unprotected-by-passwords-third-party-doma
 The solution is to install goslow locally.
 
 ### Installation
-[Download](github.com/alexandershov/goslow/releases) a precompiled binary for your operating system.
+[Download](https://github.com/alexandershov/goslow/releases) a precompiled binary for your operating system.
 
-If you're feeling adventurous, you can [build goslow from source.](github.com/alexandershov/goslow/Build.md)
+If you're feeling adventurous, you can [build goslow from source.](https://github.com/alexandershov/goslow/blob/master/Build.md)
 
 ### Usage
 
