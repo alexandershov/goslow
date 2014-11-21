@@ -4,7 +4,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/speps/go-hashids"
+	"github.com/alexandershov/go-hashids"
 	"io/ioutil"
 	"log"
 	"math/rand"
