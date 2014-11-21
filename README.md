@@ -1,3 +1,4 @@
+[![Build Status](https://travis-ci.org/alexandershov/goslow.svg?branch=master)](https://travis-ci.org/alexandershov/goslow)
 ## Why?
 Sometimes you need to test how your application handles slow/buggy
 external APIs. If you can easily configure API server domain name, then goslow will help you.
