@@ -36,7 +36,6 @@ const (
 	ADD_RULE_SUBDOMAIN_PREFIX = "admin-"
 )
 
-
 var (
 	REDIRECT_STATUSES = map[int]bool{301: true, 302: true}
 	EMPTY_HEADERS     = map[string]string{}

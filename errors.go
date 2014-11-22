@@ -8,7 +8,6 @@ import (
 const CANT_CREATE_SITE_ERROR = `Can't create.
 Try again in a few seconds or contact codumentary.com@gmail.com for help`
 
-
 type ApiError struct {
 	Message    string
 	StatusCode int
@@ -33,7 +32,7 @@ func InvalidDelayError(delay string) error {
 func DelayIsTooBigError(delayInSeconds float64) error {
 	return NewApiError(http.StatusBadRequest,
 		"Oopsie daisy! Delay can't be greater then %d seconds, got delay %.0f seconds.",
-    MAX_DELAY, delayInSeconds)
+		MAX_DELAY, delayInSeconds)
 }
 
 func ChangeBuiltinSiteError() error {
@@ -45,5 +44,5 @@ func UnknownSiteError(site string) error {
 }
 
 func CantCreateSiteError() error {
-  return NewApiError(http.StatusInternalServerError, CANT_CREATE_SITE_ERROR)
+	return NewApiError(http.StatusInternalServerError, CANT_CREATE_SITE_ERROR)
 }

@@ -186,33 +186,42 @@ func TestRuleCreation(t *testing.T) {
 	runAll(t, checkRuleCreationTestCase, ruleCreationTestCases)
 }
 
-// TODO: refactor
 func checkRuleCreationTestCase(t *testing.T, server *httptest.Server, testCase *TestCase) {
 	prefix := testCase.adminUrlPathPrefix
+	isInSingleSiteMode := prefix != ""
 	domain, site := TEST_ENDPOINT, ""
-	root_resp := []byte("haha")
-	test_resp := []byte("hop")
-	test_post_resp := []byte("for POST")
+	root_body := []byte("haha")
+	test_body := []byte("hop")
+	test_post_body := []byte("for POST")
 	empty_payload := []byte("")
-	if prefix == "" {
-		domain = newDomain(server, join(prefix, "/"), root_resp)
-		site = getSite(domain)
-	} else {
-		resp := addRule(server, &Rule{Path: join(prefix, "/"), Body: root_resp})
-		shouldHaveStatusCode(t, http.StatusOK, resp)
-	}
-	bytesShouldBeEqual(t, readBody(GET(server.URL, "/", domain)), root_resp)
-	resp := addRule(server, &Rule{Site: site, Path: join(prefix, "/test"), Body: test_resp, Method: "GET"})
-	shouldHaveStatusCode(t, http.StatusOK, resp)
 
-	bytesShouldBeEqual(t, readBody(GET(server.URL, "/test", domain)), test_resp)
+	if isInSingleSiteMode {
+		resp := addRule(server, &Rule{Path: join(prefix, "/"), Body: root_body})
+		shouldHaveStatusCode(t, http.StatusOK, resp)
+	} else {
+		domain = newDomain(server, join(prefix, "/"), root_body)
+		site = getSite(domain)
+	}
+
+	bytesShouldBeEqual(t, readBody(GET(server.URL, "/", domain)), root_body)
+
+	// testing GET rule
+	resp := addRule(server, &Rule{Site: site, Path: join(prefix, "/test"), Body: test_body, Method: "GET"})
+	shouldHaveStatusCode(t, http.StatusOK, resp)
+	// checking that GET /test rule works
+	bytesShouldBeEqual(t, readBody(GET(server.URL, "/test", domain)), test_body)
+	// checking that GET /test doesn't affect POST
 	resp = POST(server.URL, "/test", domain, []byte(""))
 	intShouldBeEqual(t, 404, resp.StatusCode)
-	resp = addRule(server, &Rule{Site: site, Path: join(prefix, "/test"), Body: test_post_resp, Method: "POST",
+
+	// testing POST rule
+	resp = addRule(server, &Rule{Site: site, Path: join(prefix, "/test"), Body: test_post_body, Method: "POST",
 		Delay: time.Duration(100) * time.Millisecond})
 	shouldHaveStatusCode(t, http.StatusOK, resp)
-	bytesShouldBeEqual(t, readBody(GET(server.URL, "/test", domain)), test_resp)
-	bytesShouldBeEqual(t, readBody(POST(server.URL, "/test", domain, []byte(""))), test_post_resp)
+	// checking that POST rule doesn't affect GET
+	bytesShouldBeEqual(t, readBody(GET(server.URL, "/test", domain)), test_body)
+	// checking that POST /test rule works
+	bytesShouldBeEqual(t, readBody(POST(server.URL, "/test", domain, empty_payload)), test_post_body)
 	shouldRespondIn(t, createPOST(server.URL, "/test", domain, empty_payload), 0.1, 0.15)
 }
 
