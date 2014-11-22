@@ -3,10 +3,10 @@ Go 1.3+ is required.
 
 Install goslow and its dependencies:
 ```shell
-go get github.com/alexandershov/goslow \
-       github.com/lib/pq               \
-       github.com/mattn/go-sqlite3     \
-       github.com/speps/go-hashids
+go get github.com/alexandershov/goslow     \
+       github.com/lib/pq                   \
+       github.com/mattn/go-sqlite3         \
+       github.com/alexandershov/go-hashids
 ```
 
 Build:
