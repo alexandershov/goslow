@@ -147,7 +147,9 @@ If you're feeling adventurous, you can [build goslow from source.](https://githu
 
 Start server:
 ```shell
-./goslow # or goslow.exe if you're on Windows
+./goslow_darwin_amd64
+# or goslow_windows_amd64.exe if you're on Windows
+# or goslow_linux_amd64 if you're on Linux
 # listening on localhost:5103
 ```
 
@@ -169,12 +171,12 @@ If you want to use a persistent storage, you'll need to specify *--driver* and *
 
 Goslow supports sqlite3:
 ```shell
-bin/goslow --driver sqlite3 --data-source /path/to/sqlite3/db/file
+./goslow --driver sqlite3 --data-source /path/to/sqlite3/db/file
 ```
 
 and postgres:
 ```shell
-bin/goslow --driver postgres --data-source postgres://user@host/dbname
+./goslow --driver postgres --data-source postgres://user@host/dbname
 # prefix 'postgres://' is required
 ```
 
