@@ -125,8 +125,9 @@ func (storage *Storage) SaveRule(rule *Rule) error {
 	// if tx gets commited then tx.Rollback() basically has no effect
 	// if there's some error, then we always want to rollback
 	defer tx.Rollback()
-	// upsert as delete-n-insert isn't correct in all cases (e.g concurrent upserts of the same rule)
-	// but is practical enough (concurrent upserts of the same rule are going to be extremely rare)
+	// upsert as delete-n-insert isn't correct in all cases
+	// (e.g concurrent upserts of the same rule will lead to "duplicate key value violates unique constraint")
+	// but is practical enough because concurrent upserts of the same rule are going to be extremely rare
 	_, err = tx.Exec(storage.dialectify(DELETE_RULE_SQL), rule.Site, rule.Path, rule.Method)
 	if err != nil {
 		return err
