@@ -1,13 +1,13 @@
 [![Build Status](https://travis-ci.org/alexandershov/goslow.svg?branch=master)](https://travis-ci.org/alexandershov/goslow)
 ## Why?
 Sometimes you need to test how your application handles slow/buggy
-external APIs. If you can easily configure API server domain name, then goslow will help you.
+external APIs. If you can easily configure external API server hostname, then goslow will help you.
 
 ## Quick start
 Let's say you're developing an application against the Facebook graph API and
-you want to know what will happen when the endpoint *graph.facebook.com/me* responds in 10 seconds.
+you want to know how your app behaves when the endpoint *graph.facebook.com/me* responds in 10 seconds.
 
-Just configure your app to make requests to *10.goslow.link* instead of *graph.facebook.com*
+Just configure your app to make requests to *10.goslow.link* instead of the *graph.facebook.com*
 and you're set:
 
 ```shell
@@ -45,7 +45,7 @@ time curl 99.goslow.link/me
 
 Need to simulate a 500 seconds delay? Use *500.goslow.link*, right?
 
-Nope. Domains *100.goslow.link*, *101.goslow.link*, ..., *599.goslow.link* respond with
+Nope! Domains *100.goslow.link*, *101.goslow.link*, ..., *599.goslow.link* respond with
 HTTP status code 100, 101, ..., 599 without any delay:
 
 ```shell
@@ -99,7 +99,7 @@ generated domain name was *5wx55yijr.goslow.link*.
 End of quick aside.
 
 
-You can add new endpoints by POSTing to *admin-5wx55yijr.goslow.link*  
+You can add new endpoints to your personal domain by POSTing to *admin-5wx55yijr.goslow.link*  
 Let's make the endpoint *5wx55yijr.goslow.link/another/* to respond to POST requests with **{"another": "response"}**
 and 3.4 seconds delay:
 ```shell
@@ -109,17 +109,18 @@ Endpoint http://5wx55yijr.goslow.link/another/ responds to POST with 3.4s delay.
 Response is: {"another": "response"}
 ```
 
-Now you have two urls sending different responses with different delays.
-```shell
-time curl -d 'any payload' 5wx55yijr.goslow.link/another/
-'{"another": "response"}'
-3.482 total
-```
+Now you have two endpoints sending different responses with different delays.
 
 ```shell
 time curl 5wx55yijr.goslow.link/me
 {"name": "zuck", "gender": "male"}
 5.028 total
+```
+
+```shell
+time curl -d 'any payload' 5wx55yijr.goslow.link/another/
+'{"another": "response"}'
+3.482 total
 ```
 
 The sky's the limit.
@@ -148,8 +149,9 @@ If you're feeling adventurous, you can [build goslow from source.](https://githu
 Start server:
 ```shell
 ./goslow_darwin_amd64
-# or goslow_windows_amd64.exe if you're on Windows
-# or goslow_linux_amd64 if you're on Linux
+# or "goslow_windows_amd64.exe" if you're on Windows
+# or "goslow_linux_amd64" if you're on Linux
+# or "goslow" if you compiled it by yourself
 # listening on localhost:5103
 ```
 
@@ -199,4 +201,4 @@ Any form of contribution is welcome.
 
 
 ## License
-MIT
+[MIT](https://github.com/alexandershov/goslow/blob/master/LICENSE)
