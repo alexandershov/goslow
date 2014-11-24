@@ -20,7 +20,7 @@ var DEFAULT_CONFIG = Config{
 	listenOn:           ":5103",
 	endpoint:           "localhost:5103",
 	driver:             "sqlite3",
-	dataSource:         ":memory:",
+	dataSource:         "file::memory:?cache=shared", // we need cache=shared in case of reconnect which happens under load
 	minSiteLength:      6,
 	siteSalt:           "",
 	createDefaultRules: false,

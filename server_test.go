@@ -22,7 +22,7 @@ const (
 )
 
 var DATA_SOURCE = map[string]string{
-	"sqlite3":  ":memory:",
+	"sqlite3":  DEFAULT_CONFIG.dataSource,
 	"postgres": "postgres://localhost/" + TEST_DB,
 }
 
