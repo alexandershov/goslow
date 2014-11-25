@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os/exec"
 	"path"
 	"strconv"
@@ -326,13 +327,18 @@ func getSite(domain string) string {
 	return strings.Split(domain, ".")[0]
 }
 
-// TODO: use normal GET-parameters builder, not Sprintf and string concatenation
 func addRule(server *httptest.Server, rule *Rule) *http.Response {
-	path := rule.Path
-	path += "?method=" + rule.Method
-	path += fmt.Sprintf("&delay=%f", rule.Delay.Seconds())
-	return POST(server.URL, path, makeHost("admin-"+rule.Site, TEST_ENDPOINT),
+	req := createPOST(server.URL, rule.Path, makeHost("admin-"+rule.Site, TEST_ENDPOINT),
 		rule.Body)
+	req.URL.RawQuery = getQueryString(rule)
+	return do(req)
+}
+
+func getQueryString(rule *Rule) string {
+	params := url.Values{}
+	params.Set("method", rule.Method)
+	params.Set("delay", fmt.Sprintf("%f", rule.Delay.Seconds()))
+	return params.Encode()
 }
 
 // Wrapper around path.Join. Preserves trailing slash.
