@@ -1,0 +1,19 @@
+---
+- hosts: goslow
+  vars:
+    gopath: "{{ lookup('env','GOPATH') }}"
+  sudo: yes
+  tasks:
+   - file: path=/etc/goslow state=directory
+   - copy: src={{ gopath }}/release/goslow dest=/usr/local/bin/goslow mode=0555
+   - copy: src=goslow.conf dest=/etc/init/goslow.conf
+   - copy: src=nginx.conf dest=/etc/nginx/nginx.conf
+   - copy: src=~/tmp/site-salt dest=/etc/goslow/site-salt force=no
+   - apt: name=nginx-full state=present
+   - apt: name=postgresql-9.1 state=present
+   - postgresql_db: name=goslow
+     sudo_user: postgres
+   - postgresql_user: db=goslow name=goslow priv=ALL
+     sudo_user: postgres
+   - service: name=nginx state=restarted
+   - service: name=goslow state=restarted
