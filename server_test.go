@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -250,7 +251,11 @@ func do(req *http.Request) *http.Response {
 }
 
 func createGET(url, path, host string) *http.Request {
-	req, err := http.NewRequest("GET", url+path, nil)
+	return createRequest("GET", url, path, host, nil)
+}
+
+func createRequest(method, url, path, host string, body io.Reader) *http.Request {
+	req, err := http.NewRequest(method, url+path, body)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -315,12 +320,7 @@ func POST(url, path, host string, payload []byte) *http.Response {
 }
 
 func createPOST(url, path, host string, payload []byte) *http.Request {
-	req, err := http.NewRequest("POST", url+path, bytes.NewReader(payload))
-	if err != nil {
-		log.Fatal(err)
-	}
-	req.Host = host
-	return req
+	return createRequest("POST", url, path, host, bytes.NewReader(payload))
 }
 
 func getSite(domain string) string {
