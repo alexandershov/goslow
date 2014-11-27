@@ -25,5 +25,5 @@
    - postgresql_user: db=goslow name=goslow priv=ALL
      sudo_user: postgres
 
-   - service: name=nginx state=restarted
+   - service: name=nginx state=reloaded
    - service: name=goslow state=restarted

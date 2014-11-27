@@ -1,10 +1,10 @@
-deploy: remote_linux ansible
+deploy: github remote_test remote_linux ansible check_output
 	true
 
 ansible:
 	ansible-playbook --ask-sudo-pass -i deploy/inventory.ini deploy/playbook.yml
 
-remote_linux: github
+remote_linux:
 	ssh cod 'cd go && GOPATH=~/go make linux'
 	scp cod:go/release/goslow_linux_amd64.zip $(GOPATH)/release
 	unzip $(GOPATH)/release/goslow_linux_amd64.zip
@@ -16,6 +16,12 @@ github:
 linux:
 	~/software/go/bin/go build -o bin/goslow_linux_amd64 github.com/alexandershov/goslow/
 	zip -j release/goslow_linux_amd64.zip bin/goslow_linux_amd64
+
+remote_test:
+	ssh cod 'cd go && GOPATH=~/go ~/software/go/bin/go test github.com/alexandershov/goslow/'
+
+check_output:
+	test "$$(curl 302.goslow.link)" = '{"goslow": "response"}'
 
 test:
 	go test github.com/alexandershov/goslow/
