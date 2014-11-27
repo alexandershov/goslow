@@ -1,14 +1,16 @@
 [![Build Status](https://travis-ci.org/alexandershov/goslow.svg?branch=master)](https://travis-ci.org/alexandershov/goslow)
 ## Why?
-Sometimes you need to test how your application handles slow/buggy
-external APIs. If you can easily configure external API server hostname, then goslow will help you.
+Imagine Facebook/Twitter/Whatever API going down and responding really slow.  
+Imagine your application using this API and slowing down because of that.  
+Want to reproduce this situation to keep it from happening ever again?  
+It's easy if you try.
 
 ## Quick start
 Let's say you're developing an application against the Facebook graph API and
 you want to know how your app behaves when the endpoint *graph.facebook.com/me* responds in 10 seconds.
 
 Just configure your app to make requests to *10.goslow.link* instead of the *graph.facebook.com*
-and you're set:
+and you're set. *10.goslow.link* responds with 10 seconds delay:
 
 ```shell
 time curl 10.goslow.link/me
