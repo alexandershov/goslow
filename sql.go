@@ -1,9 +1,9 @@
 package main
 
-// to make queries work with both sqlite3 and postgres:
+// To make queries work with both sqlite3 and postgres:
 // string " BYTEA," is replaced with " BLOB," in DDL statements
 // strings "$1", "$2", "$3", ... are replaced with "? in DML statements
-// when using sqlite3 driver
+// when using sqlite3 driver.
 
 const (
 	CREATE_SCHEMA_IF_NOT_EXISTS_SQL = `

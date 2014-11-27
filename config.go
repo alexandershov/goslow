@@ -5,6 +5,7 @@ import (
 	"log"
 )
 
+// Config stores command line arguments.
 type Config struct {
 	listenOn           string
 	endpoint           string
@@ -20,13 +21,14 @@ var DEFAULT_CONFIG = Config{
 	listenOn:           ":5103",
 	endpoint:           "localhost:5103",
 	driver:             "sqlite3",
-	dataSource:         "file::memory:?cache=shared", // we need cache=shared in case of reconnect which happens under load
+	dataSource:         "file::memory:?cache=shared", // we need cache=shared in the case of reconnect which happens sometines under load
 	minSiteLength:      6,
 	siteSalt:           "",
 	createDefaultRules: false,
 	adminUrlPathPrefix: "/goslow",
 }
 
+// NewConfigFromArgs returns a new config from command line arguments.
 func NewConfigFromArgs() *Config {
 	config := new(Config)
 	config.defineFlags()

@@ -52,6 +52,9 @@ const (
 	METHOD_PARAM      = "method"
 )
 
+// Server listens on the address specified by the config,
+// stores rules in the storage, and generates new site names
+// with the hasher.
 type Server struct {
 	config  *Config
 	storage *Storage
@@ -60,10 +63,14 @@ type Server struct {
 
 type TemplateData struct {
 	*Rule
-	Domain     string
+	// Domain is the full domain name of the rule: e.g lksdfj823.goslow.link
+	Domain string
+	// StringBody is the rule response converted to string from []byte
+	// and truncated to 80 symbols.
 	StringBody string
 }
 
+// NewServer returns a new server from the specified config.
 func NewServer(config *Config) *Server {
 	storage, err := NewStorage(config.driver, config.dataSource)
 	if err != nil {
@@ -92,6 +99,8 @@ func newHasher(salt string, minLength int) *hashids.HashID {
 	return hashids.NewWithData(hd)
 }
 
+// Server.ServeHTTP implements Handler interface.
+// It allows cross domain requests via CORS headers.
 func (server *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	log.Printf("%s %s", req.Method, req.URL.Path)
 	var err error = nil
@@ -494,6 +503,7 @@ func (server *Server) ensureEmptySiteExists() {
 	}
 }
 
+// Server.ListenAndServe listens on the address specified by the config.
 func (server *Server) ListenAndServe() error {
 	log.Printf("listening on %s", server.config.listenOn)
 	return http.ListenAndServe(server.config.listenOn, server)

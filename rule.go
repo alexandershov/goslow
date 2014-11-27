@@ -5,6 +5,7 @@ import (
 	"time"
 )
 
+// Rule describes path/HTTP/delay properties of the endpoint.
 type Rule struct {
 	Site       string
 	Path       string
@@ -15,12 +16,14 @@ type Rule struct {
 	Body       []byte
 }
 
+// Rule.Matches returns true if rule matches a given request.
 func (rule *Rule) Matches(req *http.Request) bool {
 	return matches(rule.Path, req.URL.Path) && matches(rule.Method, req.Method)
 }
 
+// matches returns true if pattern matches the name. Empty pattern matches anything.
+// Pattern is just a string - all special characters (*?.) are interpreted as is.
 func matches(pattern, name string) bool {
-	// empty pattern matches anything
 	if pattern == ANY {
 		return true
 	}

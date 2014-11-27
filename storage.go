@@ -12,15 +12,17 @@ import (
 	"time"
 )
 
-// Matches $1, $2, $3, ...
+// regexp POSTGRES_PLACEHOLDERS matches strings '$1'', '$2', '$3', ...
 var POSTGRES_PLACEHOLDERS *regexp.Regexp = regexp.MustCompile("\\$\\d+")
 
+// Storage is a window to the SQL world.
 type Storage struct {
 	driver     string
 	dataSource string
 	db         *sql.DB
 }
 
+// NewStorage returns a new storage with the given driver and dataSource.
 func NewStorage(driver string, dataSource string) (*Storage, error) {
 	db, err := sql.Open(driver, dataSource)
 	if err != nil {
@@ -31,6 +33,7 @@ func NewStorage(driver string, dataSource string) (*Storage, error) {
 	return storage, err
 }
 
+// Storage.FindRuleMatching returns a rule matching a given site and HTTP request.
 func (storage *Storage) FindRuleMatching(site string, req *http.Request) (rule *Rule, found bool, err error) {
 	rules, err := storage.getRules(site)
 	if err != nil {
@@ -117,6 +120,8 @@ func objectToStringMap(object map[string]interface{}) (map[string]string, error)
 	return m, nil
 }
 
+// Storage.SaveRule saves a given rule into the database.
+// If the rule doesn't exist in a database, Storage.SaveRule creates a new rule.
 func (storage *Storage) SaveRule(rule *Rule) error {
 	tx, err := storage.db.Begin()
 	if err != nil {
@@ -149,11 +154,14 @@ func stringMapToJson(m map[string]string) (js string, err error) {
 	return string(b), err
 }
 
+// Storage.CreateSite creates a new site.
+// Storage.CreateSite returns an error if the given site already exists in a database.
 func (storage *Storage) CreateSite(site string) error {
 	_, err := storage.db.Exec(storage.dialectify(INSERT_SITE_SQL), site)
 	return err
 }
 
+// Storage.ContainsSite returns true if the given site exists in a database.
 func (storage *Storage) ContainsSite(site string) (bool, error) {
 	rows, err := storage.db.Query(storage.dialectify(GET_SITE_SQL), site)
 	if err != nil {

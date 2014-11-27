@@ -8,11 +8,14 @@ import (
 const CANT_CREATE_SITE_ERROR = `Can't create.
 Try again in a few seconds or contact codumentary.com@gmail.com for help`
 
+// ApiError stores response error messages and HTTP status code.
 type ApiError struct {
 	Message    string
 	StatusCode int
 }
 
+// NewApiError returns an ApiError with the given status code and a message made from
+// the format string.
 func NewApiError(statusCode int, format string, a ...interface{}) error {
 	return &ApiError{
 		Message:    fmt.Sprintf(format, a...),
@@ -20,6 +23,7 @@ func NewApiError(statusCode int, format string, a ...interface{}) error {
 	}
 }
 
+// ApiError.Error returns error message.
 func (error *ApiError) Error() string {
 	return error.Message
 }
@@ -35,6 +39,8 @@ func DelayIsTooBigError(delayInSeconds float64) error {
 		MAX_DELAY, delayInSeconds)
 }
 
+// ChangeBuiltinSiteError returns an ApiError when somebody tries to
+// change a built-in site.
 func ChangeBuiltinSiteError() error {
 	return NewApiError(http.StatusForbidden, "Oopsie daisy! You can't change builtin sites.")
 }
