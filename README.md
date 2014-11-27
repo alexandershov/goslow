@@ -18,7 +18,7 @@ time curl 10.goslow.link/me
 10.423 total
 ```
 
-Well, almost set, because you've got a canned response **{"goslow": "response"}**.
+Well, you're almost set, because you received a canned response **{"goslow": "response"}**.
 You probably wanted to get the usual graph API response: **{"name": "zuck", "gender": "male"}**.  
 No worries, we'll get to that later.
 
@@ -29,7 +29,7 @@ time curl -X POST -d 'your payload' '10.goslow.link/me/feed?message="test"'
 10.223 total
 ```
 
-Need to simulate a 6 seconds delay? Just use *6.goslow.link* instead of *10.goslow.link*
+Need to fake a 6 seconds delay? Just use *6.goslow.link* instead of *10.goslow.link*
 
 
 ```shell
@@ -45,7 +45,7 @@ time curl 99.goslow.link/me
 99.204 total
 ```
 
-Need to simulate a 500 seconds delay? Use *500.goslow.link*, right?
+Need to fake a 500 seconds delay? Use *500.goslow.link*, right?
 
 Nope! Domains *100.goslow.link*, *101.goslow.link*, ..., *599.goslow.link* respond with
 HTTP status code 100, 101, ..., 599 without any delay:
@@ -70,7 +70,7 @@ time curl -w "%{redirect_url}" 302.goslow.link/me
 Remember that bit? Well, it's later time!
 
 Back to the Facebook graph API example.
-Let's say you're using the endpoint *graph.facebook.com/me* and you want to: 
+You're using the endpoint *graph.facebook.com/me* and you want to:
 
 1. Slow it down by 5 seconds.
 2. Get **{"name": "zuck", "gender": "male"}** in response.
@@ -93,7 +93,7 @@ time curl 5wx55yijr.goslow.link/me
 5.382 total
 ```
 
-Now, what's the deal with the "*your personal goslow domain is 5wx55yijr.goslow.link*"? Well, the domain *5wx55yijr.goslow.link* is all yours and you can add different endpoints to it.
+Now, what's the deal with the "*your personal goslow domain is 5wx55yijr.goslow.link*"? Well, the domain *5wx55yijr.goslow.link* is all yours and you can add your custom endpoints to it.
 
 Quick aside:
 when *you* POST to *create.goslow.link* your personal goslow domain will be a little different
@@ -102,7 +102,10 @@ generated domain name was *5wx55yijr.goslow.link*.
 End of quick aside.
 
 
-You can add new endpoints to your personal domain by POSTing to *admin-5wx55yijr.goslow.link*  
+You can add new endpoints to your personal domain by POSTing to *admin-5wx55yijr.goslow.link*
+
+Simple rule. Want an endpoint 5wx55yijr.goslow.link/your-path to respond with **your-response**? Post **your-response** to admin-5wx55yijr.goslow.link/your-path.
+
 Let's make the endpoint *5wx55yijr.goslow.link/another/* to respond to POST requests with **{"another": "response"}**
 and 3.4 seconds delay:
 ```shell
@@ -128,7 +131,7 @@ time curl -d 'any payload' 5wx55yijr.goslow.link/another/
 
 The sky's the limit.
 
-Worried whether slow javascript CDN will bring your app down? Goslow've got you covered:
+Worried whether slow javascript CDN will bring down your app? Goslow've got you covered:
 ```shell
 curl ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js | curl -d @- "admin-5wx55yijr.goslow.link/ajax/libs/jquery/2.1.1/jquery.min.js?delay=20"
 
@@ -155,13 +158,17 @@ Start server:
 # or "goslow_windows_amd64.exe" if you're on Windows
 # or "goslow_linux_amd64" if you're on Linux
 # or "goslow" if you compiled it by yourself
+
 # listening on localhost:5103
 ```
 
 By default goslow runs in a single domain mode
 because nobody wants to deal with the dynamically generated subdomain names on a localhost.
 
-You can configure goslow with the POST requests to the endpoint /goslow  
+You can configure goslow with POST requests to the endpoint /goslow.
+
+Simple rule for a local instance of goslow. Want an endpoint localhost:5103/your-path to respond with **your-response**? Post **your-response** to localhost:5103/goslow/your-path.
+
 Let's add the endpoint */feed*:
 ```shell
 curl -d '{"local": "response"}' 'localhost:5103/goslow/feed?delay=4.3'
@@ -171,8 +178,8 @@ Response is: {"local": "response"}
 ```
 
 
-By default goslow stores all data in memory. This means that any endpoint you add will be lost after restart.
-If you want to use a persistent storage, you'll need to specify *--driver* and *--data-source* options.
+By default goslow stores endpoint data in memory. This means that any endpoint you add will be lost after restart.
+If you want to use a persistent storage, then you need to specify *--driver* and *--data-source* options.
 
 Goslow supports sqlite3:
 ```shell
