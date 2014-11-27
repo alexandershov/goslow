@@ -70,7 +70,8 @@ time curl -w "%{redirect_url}" 302.goslow.link/me
 Remember that bit? Well, it's later time!
 
 Back to the Facebook graph API example.
-Let's say you're using the endpoint *graph.facebook.com/me* and you want to:
+Let's say you're using the endpoint *graph.facebook.com/me* and you want to: 
+
 1. Slow it down by 5 seconds.
 2. Get **{"name": "zuck", "gender": "male"}** in response.
 
