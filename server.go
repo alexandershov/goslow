@@ -22,9 +22,9 @@ var (
 )
 
 const (
-	MIN_DELAY       = 0  // seconds
-	MAX_DELAY       = 99 // seconds
-	MIN_STATUS_CODE = 100
+	MIN_DELAY       = 0   // seconds
+	MAX_DELAY       = 199 // seconds
+	MIN_STATUS_CODE = 200
 	MAX_STATUS_CODE = 599
 	ZERO_DELAY_SITE = "0"
 	EMPTY_SITE      = ""
