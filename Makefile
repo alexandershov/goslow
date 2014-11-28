@@ -21,7 +21,8 @@ remote_test:
 	ssh cod 'cd go && GOPATH=~/go ~/software/go/bin/go test github.com/alexandershov/goslow/'
 
 check_output:
-	test "$$(curl 302.goslow.link)" = '{"goslow": "response"}'
+	python deploy/check_delay_responses.py
+	python deploy/check_status_code_responses.py
 
 test:
 	go test github.com/alexandershov/goslow/
