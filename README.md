@@ -38,17 +38,17 @@ time curl 6.goslow.link/any-endpoint-works
 6.178 total
 ```
 
-Need to simulate some serious delay? Use *99.goslow.link*:
+Need to simulate some serious delay? Use *199.goslow.link*:
 ```shell
-time curl 99.goslow.link/me
+time curl 199.goslow.link/me
 {"goslow": "response"}
-99.204 total
+199.204 total
 ```
 
 Need to fake a 500 seconds delay? Use *500.goslow.link*, right?
 
-Nope! Domains *100.goslow.link*, *101.goslow.link*, ..., *599.goslow.link* respond with
-HTTP status code 100, 101, ..., 599 without any delay:
+Nope! Domains *200.goslow.link*, *201.goslow.link*, ..., *599.goslow.link* respond with
+HTTP status code 200, 201, ..., 599 without any delay:
 
 ```shell
 time curl -w "%{http_code}" 500.goslow.link/me
