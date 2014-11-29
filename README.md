@@ -67,7 +67,7 @@ time curl -w "%{redirect_url}" 302.goslow.link/me
 ## Not-so-quick start
 > No worries, we'll get to that later.
 
-Remember that bit? Well, it's later time!
+Remember that bit? It's later time!
 
 Back to the Facebook graph API example.
 You're using the endpoint *graph.facebook.com/me* and you want to:
@@ -75,7 +75,7 @@ You're using the endpoint *graph.facebook.com/me* and you want to:
 1. Slow it down by 5 seconds.
 2. Get **{"name": "zuck", "gender": "male"}** in response.
 
-Just make a POST request to *create.goslow.link/me?delay=5* with the payload **{"name": "zuck", "gender": "male"}** and you're set.
+Just make a POST request to *create.goslow.link/me?delay=5* with the payload **{"name": "zuck", "gender": "male"}** and you're set. cURL is a great way to do it:
 ```shell
 curl -d '{"name": "zuck", "gender": "male"}' 'create.goslow.link/me?delay=5'
 Hooray!
@@ -184,6 +184,8 @@ If you want to use a persistent storage, then you need to specify *--driver* and
 Goslow supports sqlite3:
 ```shell
 ./goslow --driver sqlite3 --data-source /path/to/sqlite3/db/file
+# actually, sqlite3 is the default driver, so this'll do:
+# ./goslow --data-source /path/to/sqlite3/db/file
 ```
 
 and postgres:
