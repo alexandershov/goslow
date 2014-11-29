@@ -82,8 +82,8 @@ func NewServer(config *Config) *Server {
 		storage: storage,
 		hasher:  newHasher(config.siteSalt, config.minSiteLength),
 	}
-	if config.createDefaultRules {
-		server.createDefaultRules()
+	if config.createDefaultEndpoints {
+		server.createDefaultEndpoints()
 	}
 	if server.isInSingleSiteMode() {
 		server.ensureEmptySiteExists()
@@ -361,7 +361,7 @@ func (server *Server) isAddRulePath(path string) bool {
 
 func (server *Server) handleAddRule(w http.ResponseWriter, req *http.Request) error {
 	site := server.getSite(req)
-	if isBuiltinSite(site) {
+	if isBuiltin(site) {
 		return ChangeBuiltinSiteError()
 	}
 	err := server.errorIfSiteExists(site)
@@ -388,11 +388,11 @@ func (server *Server) getSite(req *http.Request) string {
 	return subdomain
 }
 
-func isBuiltinSite(site string) bool {
-	return site == CREATE_SUBDOMAIN_NAME || isDefaultRuleSite(site)
+func isBuiltin(site string) bool {
+	return site == CREATE_SUBDOMAIN_NAME || isDefault(site)
 }
 
-func isDefaultRuleSite(site string) bool {
+func isDefault(site string) bool {
 	i, err := strconv.Atoi(site)
 	if err != nil {
 		return false
@@ -439,12 +439,12 @@ func addHeaders(headers map[string]string, responseHeader http.Header) {
 	}
 }
 
-func (server *Server) createDefaultRules() {
-	server.createRules(MIN_DELAY, MAX_DELAY)
-	server.createRules(MIN_STATUS_CODE, MAX_STATUS_CODE)
+func (server *Server) createDefaultEndpoints() {
+	server.createEndpoints(MIN_DELAY, MAX_DELAY)
+	server.createEndpoints(MIN_STATUS_CODE, MAX_STATUS_CODE)
 }
 
-func (server *Server) createRules(minSite, maxSite int) {
+func (server *Server) createEndpoints(minSite, maxSite int) {
 	for i := minSite; i <= maxSite; i++ {
 		site := strconv.Itoa(i)
 		err := server.storage.CreateSite(site)

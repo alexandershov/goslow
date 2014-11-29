@@ -29,10 +29,10 @@ var DATA_SOURCE = map[string]string{
 }
 
 type TestCase struct {
-	createDefaultRules bool
-	adminUrlPathPrefix string
-	driver             string
-	dataSource         string
+	createDefaultEndpoints bool
+	adminUrlPathPrefix     string
+	driver                 string
+	dataSource             string
 }
 
 type TestCases []*TestCase
@@ -54,16 +54,16 @@ var (
 	}
 )
 
-func NewTestCase(createDefaultRules bool, adminUrlPathPrefix string, driver string) *TestCase {
+func NewTestCase(createDefaultEndpoints bool, adminUrlPathPrefix string, driver string) *TestCase {
 	dataSource, knownDriver := DATA_SOURCE[driver]
 	if driver != ANY_DB_DRIVER && !knownDriver {
 		log.Fatalf("unknown driver: <%s>", driver)
 	}
 	return &TestCase{
-		createDefaultRules: createDefaultRules,
-		adminUrlPathPrefix: adminUrlPathPrefix,
-		driver:             driver,
-		dataSource:         dataSource,
+		createDefaultEndpoints: createDefaultEndpoints,
+		adminUrlPathPrefix:     adminUrlPathPrefix,
+		driver:                 driver,
+		dataSource:             dataSource,
 	}
 }
 
@@ -91,8 +91,8 @@ func all(testCases TestCases) TestCases {
 	allTestCases := make(TestCases, 0)
 	for _, testCase := range testCases {
 		if testCase.driver == ANY_DB_DRIVER {
-			sqlite3TestCase := NewTestCase(testCase.createDefaultRules, testCase.adminUrlPathPrefix, "sqlite3")
-			postgresTestCase := NewTestCase(testCase.createDefaultRules, testCase.adminUrlPathPrefix, "postgres")
+			sqlite3TestCase := NewTestCase(testCase.createDefaultEndpoints, testCase.adminUrlPathPrefix, "sqlite3")
+			postgresTestCase := NewTestCase(testCase.createDefaultEndpoints, testCase.adminUrlPathPrefix, "postgres")
 			allTestCases = append(allTestCases, sqlite3TestCase)
 			allTestCases = append(allTestCases, postgresTestCase)
 		} else {
@@ -230,7 +230,7 @@ func checkRuleCreationTestCase(t *testing.T, server *httptest.Server, testCase *
 func newSubDomainServer(testCase *TestCase) *Server {
 	config := DEFAULT_CONFIG // copies DEFAULT_CONFIG
 	config.endpoint = TEST_ENDPOINT
-	config.createDefaultRules = testCase.createDefaultRules
+	config.createDefaultEndpoints = testCase.createDefaultEndpoints
 	config.adminUrlPathPrefix = testCase.adminUrlPathPrefix
 	config.driver = testCase.driver
 	config.dataSource = testCase.dataSource
