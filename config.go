@@ -32,7 +32,7 @@ var DEFAULT_CONFIG = Config{
 func NewConfigFromArgs() *Config {
 	config := new(Config)
 	config.defineFlags()
-	flag.Parse()
+	config.parseFlags()
 	config.validate()
 	return config
 }
@@ -66,6 +66,10 @@ func (config *Config) defineFlags() {
 		`If not an empty string: run in single domain mode
 	and use the endpoint http://LISTEN-ON/ADMIN-URL-PATH-PREFIX (default is http://localhost:5103/goslow)
 	to configurate responses`)
+}
+
+func (config *Config) parseFlags() {
+	flag.Parse()
 }
 
 func (config *Config) validate() {

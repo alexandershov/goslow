@@ -22,7 +22,7 @@ func (rule *Rule) Matches(req *http.Request) bool {
 }
 
 // matches returns true if pattern matches the name. Empty pattern matches anything.
-// Pattern is just a string - all special characters (*?.) are interpreted as is.
+// Pattern is just a string - all special characters (*?.) are not special and interpreted as is.
 func matches(pattern, name string) bool {
 	if pattern == ANY {
 		return true
