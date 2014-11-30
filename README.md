@@ -2,8 +2,8 @@
 ## Why?
 Imagine Facebook/Twitter/Whatever API going down and responding really slow.  
 Imagine your application using this API and slowing down because of that.  
-Want to reproduce this situation to keep it from happening ever again?  
-It's easy if you try.
+Need an always-slow API to reproduce this situation reliably?  
+Goslow is that API.
 
 ## Quick start
 Let's say you're developing an application against the Facebook graph API and
