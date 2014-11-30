@@ -2,7 +2,7 @@ deploy: github remote_test remote_linux ansible check_output
 	true
 
 ansible:
-	ansible-playbook --ask-sudo-pass -i deploy/inventory.ini deploy/playbook.yml
+	ansible-playbook -i deploy/inventory.ini deploy/playbook.yml
 
 remote_linux:
 	ssh cod 'cd go && GOPATH=~/go make linux'
