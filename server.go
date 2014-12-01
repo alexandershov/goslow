@@ -44,7 +44,7 @@ var (
 
 const (
 	MAX_GENERATE_SITE_NAME_ATTEMPTS = 5
-	GOSLOW_LAUNCH_TIMESTAMP         = 1415975661 // TODO: update it before launch
+	GOSLOW_LAUNCH_TIMESTAMP         = 1417447141
 )
 
 const (
