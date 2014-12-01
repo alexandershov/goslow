@@ -282,7 +282,7 @@ func getRandomDurationBetween(minMilliseconds, maxMilliseconds int) time.Duratio
 }
 
 func (server *Server) handleError(err error, w http.ResponseWriter) {
-	log.Print(err)
+	log.Printf("error: %s", err)
 	apiError, isApiError := err.(*ApiError)
 	if isApiError {
 		http.Error(w, apiError.Error(), apiError.StatusCode)
