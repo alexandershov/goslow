@@ -103,7 +103,7 @@ func newHasher(salt string, minLength int) *hashids.HashID {
 // Server.ServeHTTP implements Handler interface.
 // It allows cross domain requests via CORS headers.
 func (server *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	log.Printf("%s\t%s\t%s", getRealIP(req), req.Method, req.URL.Path)
+	start := time.Now()
 	var err error = nil
 	switch {
 	case server.isOptions(req):
@@ -122,6 +122,8 @@ func (server *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		server.handleError(err, w)
 	}
+	duration := time.Since(start)
+	log.Printf("%s\t%s\t%s\t%s\t%s", getRealIP(req), req.Method, req.Host, req.URL.Path, duration)
 }
 
 func getRealIP(req *http.Request) string {
