@@ -8,7 +8,7 @@ import (
 const CANT_CREATE_SITE_ERROR = `Can't create.
 Try again in a few seconds or contact codumentary.com@gmail.com for help`
 
-// ApiError stores response error messages and HTTP status code.
+// ApiError stores response error message and HTTP status code.
 type ApiError struct {
 	Message    string
 	StatusCode int
