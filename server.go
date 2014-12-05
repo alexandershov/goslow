@@ -65,7 +65,7 @@ type Server struct {
 type TemplateData struct {
 	*Rule
 	// Domain is the full domain name of the rule: e.g lksdfj823.goslow.link
-	Domain string
+	Domain             string
 	AdminUrlPathPrefix string
 	// StringBody is the rule response converted to string from []byte
 	// and truncated to 80 symbols.
@@ -224,12 +224,12 @@ func (server *Server) makeRule(site string, req *http.Request) (*Rule, error) {
 		return nil, err
 	}
 	path := server.getRulePath(req)
-	method := getRuleMethod(values)
-	delay, err := getRuleDelay(values)
+	method := server.getRuleMethod(values)
+	delay, err := server.getRuleDelay(values)
 	if err != nil {
 		return nil, err
 	}
-	statusCode, err := getRuleStatusCode(values)
+	statusCode, err := server.getRuleStatusCode(values)
 	if err != nil {
 		return nil, err
 	}
@@ -249,7 +249,7 @@ func (server *Server) makeRule(site string, req *http.Request) (*Rule, error) {
 	return rule, nil
 }
 
-func getRuleDelay(values url.Values) (time.Duration, error) {
+func (server *Server) getRuleDelay(values url.Values) (time.Duration, error) {
 	_, contains := values[DELAY_PARAM]
 	if !contains {
 		return DEFAULT_DELAY, nil
@@ -265,7 +265,7 @@ func getRuleDelay(values url.Values) (time.Duration, error) {
 	return time.Duration(delayInSeconds*1000) * time.Millisecond, nil
 }
 
-func getRuleStatusCode(values url.Values) (int, error) {
+func (server *Server) getRuleStatusCode(values url.Values) (int, error) {
 	_, contains := values[STATUS_CODE_PARAM]
 	if !contains {
 		return DEFAULT_STATUS_CODE, nil
@@ -273,7 +273,7 @@ func getRuleStatusCode(values url.Values) (int, error) {
 	return strconv.Atoi(values.Get(STATUS_CODE_PARAM))
 }
 
-func getRuleMethod(values url.Values) string {
+func (server *Server) getRuleMethod(values url.Values) string {
 	return values.Get(METHOD_PARAM)
 }
 
@@ -316,10 +316,10 @@ func (server *Server) showLongCreateSiteHelp(w http.ResponseWriter, rule *Rule) 
 
 func (server *Server) makeTemplateData(rule *Rule) *TemplateData {
 	return &TemplateData{
-		Rule:       rule,
-		Domain:     server.makeFullDomain(rule.Site),
+		Rule:               rule,
+		Domain:             server.makeFullDomain(rule.Site),
 		AdminUrlPathPrefix: server.config.adminUrlPathPrefix,
-		StringBody: truncate(string(rule.Body), 80),
+		StringBody:         truncate(string(rule.Body), 80),
 	}
 }
 
