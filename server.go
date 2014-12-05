@@ -66,6 +66,7 @@ type TemplateData struct {
 	*Rule
 	// Domain is the full domain name of the rule: e.g lksdfj823.goslow.link
 	Domain string
+	AdminUrlPathPrefix string
 	// StringBody is the rule response converted to string from []byte
 	// and truncated to 80 symbols.
 	StringBody string
@@ -317,6 +318,7 @@ func (server *Server) makeTemplateData(rule *Rule) *TemplateData {
 	return &TemplateData{
 		Rule:       rule,
 		Domain:     server.makeFullDomain(rule.Site),
+		AdminUrlPathPrefix: server.config.adminUrlPathPrefix,
 		StringBody: truncate(string(rule.Body), 80),
 	}
 }
@@ -344,7 +346,7 @@ func (server *Server) respondFromRule(w http.ResponseWriter, req *http.Request) 
 	if found {
 		applyRule(rule, w)
 	} else {
-		http.Error(w, "Oopsie daisy! This endpoint isn't configured yet.", http.StatusNotFound)
+		server.handleUnknownEndpoint(w, req)
 	}
 	return nil
 }
@@ -376,7 +378,7 @@ func (server *Server) handleAddRule(w http.ResponseWriter, req *http.Request) er
 	if isBuiltin(site) {
 		return ChangeBuiltinSiteError()
 	}
-	err := server.errorIfSiteExists(site)
+	err := server.errorIfSiteDoesNotExist(site)
 	if err != nil {
 		return err
 	}
@@ -391,7 +393,7 @@ func (server *Server) handleAddRule(w http.ResponseWriter, req *http.Request) er
 
 func (server *Server) getSite(req *http.Request) string {
 	if server.isInSingleSiteMode() {
-		return ""
+		return EMPTY_SITE
 	}
 	subdomain := getSubdomain(req.Host)
 	if server.isAddRule(req) {
@@ -401,7 +403,11 @@ func (server *Server) getSite(req *http.Request) string {
 }
 
 func isBuiltin(site string) bool {
-	return site == CREATE_SUBDOMAIN_NAME || isDefault(site)
+	return isCreate(site) || isDefault(site)
+}
+
+func isCreate(site string) bool {
+	return site == CREATE_SUBDOMAIN_NAME
 }
 
 func isDefault(site string) bool {
@@ -412,7 +418,7 @@ func isDefault(site string) bool {
 	return i <= MAX_STATUS_CODE
 }
 
-func (server *Server) errorIfSiteExists(site string) error {
+func (server *Server) errorIfSiteDoesNotExist(site string) error {
 	exists, err := server.storage.ContainsSite(site)
 	if err != nil {
 		return err
@@ -451,12 +457,31 @@ func addHeaders(headers map[string]string, responseHeader http.Header) {
 	}
 }
 
-func (server *Server) createDefaultEndpoints() {
-	server.createEndpoints(MIN_DELAY, MAX_DELAY)
-	server.createEndpoints(MIN_STATUS_CODE, MAX_STATUS_CODE)
+func (server *Server) handleUnknownEndpoint(w http.ResponseWriter, req *http.Request) {
+	w.WriteHeader(http.StatusNotFound)
+	site := server.getSite(req)
+	rule := &Rule{Site: site, Path: server.getRulePath(req)}
+	BANNER_TEMPLATE.Execute(w, nil)
+	templateData := server.makeTemplateData(rule)
+	// TODO: handle missing site error
+	switch {
+	case server.isInSingleSiteMode():
+		UNKNOWN_ENDPOINT_TEMPLATE.Execute(w, templateData)
+	case isCreate(site):
+		CREATE_SITE_HELP_TEMPLATE.Execute(w, templateData)
+	case isBuiltin(site):
+		UNKNOWN_ERROR_TEMPLATE.Execute(w, templateData)
+	default:
+		UNKNOWN_ENDPOINT_TEMPLATE.Execute(w, templateData)
+	}
 }
 
-func (server *Server) createEndpoints(minSite, maxSite int) {
+func (server *Server) createDefaultEndpoints() {
+	server.createSitesInRange(MIN_DELAY, MAX_DELAY)
+	server.createSitesInRange(MIN_STATUS_CODE, MAX_STATUS_CODE)
+}
+
+func (server *Server) createSitesInRange(minSite, maxSite int) {
 	for i := minSite; i <= maxSite; i++ {
 		site := strconv.Itoa(i)
 		err := server.storage.CreateSite(site)
