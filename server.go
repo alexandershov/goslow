@@ -62,16 +62,6 @@ type Server struct {
 	hasher  *hashids.HashID
 }
 
-type TemplateData struct {
-	*Rule
-	// Domain is the full domain name of the rule: e.g lksdfj823.goslow.link
-	Domain             string
-	AdminUrlPathPrefix string
-	// StringBody is the rule response converted to string from []byte
-	// and truncated to 80 symbols.
-	StringBody string
-}
-
 // NewServer returns a new server from the specified config.
 func NewServer(config *Config) *Server {
 	storage, err := NewStorage(config.driver, config.dataSource)
@@ -308,18 +298,24 @@ func (server *Server) showShortCreateSiteHelp(w http.ResponseWriter, rule *Rule)
 func (server *Server) showLongCreateSiteHelp(w http.ResponseWriter, rule *Rule) {
 	templateData := server.makeTemplateData(rule)
 	BANNER_TEMPLATE.Execute(w, nil)
-	ADD_RULE_TEMPLATE.Execute(w, templateData)
+	RULE_ADDED_TEMPLATE.Execute(w, templateData)
 	fmt.Fprintln(w)
-	CREATE_SITE_TEMPLATE.Execute(w, templateData)
+	SITE_CREATED_TEMPLATE.Execute(w, templateData)
 	fmt.Fprintln(w)
+	ADD_RULE_EXAMPLE_TEMPLATE.Execute(w, server.makeTemplateData(server.makeExampleRule(rule)))
 }
 
 func (server *Server) makeTemplateData(rule *Rule) *TemplateData {
 	return &TemplateData{
-		Rule:               rule,
+		Site:               rule.Site,
+		Path:               rule.Path,
+		Method:             rule.Method,
+		Delay:              rule.Delay,
+		TruncatedBody:      truncate(string(rule.Body), 80),
+		CreateDomain:       server.makeFullDomain(CREATE_SUBDOMAIN_NAME),
 		Domain:             server.makeFullDomain(rule.Site),
+		AdminDomain:        server.makeAdminDomain(rule.Site),
 		AdminUrlPathPrefix: server.config.adminUrlPathPrefix,
-		StringBody:         truncate(string(rule.Body), 80),
 	}
 }
 
@@ -338,6 +334,25 @@ func (server *Server) makeFullDomain(site string) string {
 	return fmt.Sprintf("%s.%s", site, server.config.endpoint)
 }
 
+func (server *Server) makeAdminDomain(site string) string {
+	if server.isInSingleSiteMode() {
+		return server.config.endpoint
+	}
+	return fmt.Sprintf("admin-%s", server.makeFullDomain(site))
+}
+
+func (server *Server) makeAdminPath(site string) string {
+	adminDomain := server.makeAdminDomain(site)
+	return adminDomain + server.config.adminUrlPathPrefix
+}
+
+func (server *Server) makeExampleRule(rule *Rule) *Rule {
+	example := *rule // make a copy
+	example.Path = "/christmas"
+	example.Body = []byte("hohoho")
+	return &example
+}
+
 func (server *Server) respondFromRule(w http.ResponseWriter, req *http.Request) error {
 	rule, found, err := server.storage.FindRuleMatching(server.getSite(req), req)
 	if err != nil {
@@ -346,7 +361,7 @@ func (server *Server) respondFromRule(w http.ResponseWriter, req *http.Request) 
 	if found {
 		applyRule(rule, w)
 	} else {
-		server.handleUnknownEndpoint(w, req)
+		return server.handleUnknownEndpoint(w, req)
 	}
 	return nil
 }
@@ -378,16 +393,20 @@ func (server *Server) handleAddRule(w http.ResponseWriter, req *http.Request) er
 	if isBuiltin(site) {
 		return ChangeBuiltinSiteError()
 	}
-	err := server.errorIfSiteDoesNotExist(site)
+	contains, err := server.storage.ContainsSite(site)
 	if err != nil {
 		return err
+	}
+	if !contains {
+		// TODO: show a long help text here (like in handleUnknownEndpoint)
+		return UnknownSiteError(site)
 	}
 	rule, err := server.addRule(site, req)
 	if err != nil {
 		return err
 	}
 	BANNER_TEMPLATE.Execute(w, nil)
-	ADD_RULE_TEMPLATE.Execute(w, server.makeTemplateData(rule))
+	RULE_ADDED_TEMPLATE.Execute(w, server.makeTemplateData(rule))
 	return nil
 }
 
@@ -418,17 +437,6 @@ func isDefault(site string) bool {
 	return i <= MAX_STATUS_CODE
 }
 
-func (server *Server) errorIfSiteDoesNotExist(site string) error {
-	exists, err := server.storage.ContainsSite(site)
-	if err != nil {
-		return err
-	}
-	if !exists {
-		return UnknownSiteError(site)
-	}
-	return nil
-}
-
 func (server *Server) getRulePath(req *http.Request) string {
 	if server.isInSingleSiteMode() {
 		path := strings.TrimPrefix(req.URL.Path, server.config.adminUrlPathPrefix)
@@ -457,23 +465,53 @@ func addHeaders(headers map[string]string, responseHeader http.Header) {
 	}
 }
 
-func (server *Server) handleUnknownEndpoint(w http.ResponseWriter, req *http.Request) {
+func (server *Server) handleUnknownEndpoint(w http.ResponseWriter, req *http.Request) error {
 	w.WriteHeader(http.StatusNotFound)
+
 	site := server.getSite(req)
+	containsSite, err := server.storage.ContainsSite(site)
+	if err != nil {
+		return err
+	}
+
 	rule := &Rule{Site: site, Path: server.getRulePath(req)}
-	BANNER_TEMPLATE.Execute(w, nil)
 	templateData := server.makeTemplateData(rule)
-	// TODO: handle missing site error
+
+	BANNER_TEMPLATE.Execute(w, nil)
+
 	switch {
 	case server.isInSingleSiteMode():
+		exampleTemplateData := *templateData
+		exampleTemplateData.TruncatedBody = "hohoho"
+		// TODO: why do we need both templateData and exampleTemplateData?
 		UNKNOWN_ENDPOINT_TEMPLATE.Execute(w, templateData)
+		ADD_RULE_EXAMPLE_TEMPLATE.Execute(w, exampleTemplateData)
+
 	case isCreate(site):
+		exampleTemplateData := *templateData
+		exampleTemplateData.TruncatedBody = "hohoho"
 		CREATE_SITE_HELP_TEMPLATE.Execute(w, templateData)
+		fmt.Fprintln(w) // TODO: why we need two calls to Fprintln?
+		fmt.Fprintln(w)
+		CREATE_SITE_EXAMPLE_TEMPLATE.Execute(w, exampleTemplateData)
+
 	case isBuiltin(site):
 		UNKNOWN_ERROR_TEMPLATE.Execute(w, templateData)
-	default:
+
+	case !containsSite:
+		exampleTemplateData := *templateData
+		exampleTemplateData.TruncatedBody = "hohoho"
+		UNKNOWN_SITE_TEMPLATE.Execute(w, templateData)
+		CREATE_SITE_EXAMPLE_TEMPLATE.Execute(w, exampleTemplateData)
+
+	default: // when will this branch be chosen?
+		exampleTemplateData := *templateData
+		exampleTemplateData.TruncatedBody = "hohoho"
+		// TODO: why do we need both templateData and exampleTemplateData?
 		UNKNOWN_ENDPOINT_TEMPLATE.Execute(w, templateData)
+		ADD_RULE_EXAMPLE_TEMPLATE.Execute(w, exampleTemplateData)
 	}
+	return nil
 }
 
 func (server *Server) createDefaultEndpoints() {
