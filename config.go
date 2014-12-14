@@ -8,13 +8,13 @@ import (
 // Config stores command line arguments.
 type Config struct {
 	listenOn               string
-	endpoint               string
+	endpoint               string // TODO: rename
 	driver                 string
 	dataSource             string
 	minSiteLength          int
 	siteSalt               string
 	createDefaultEndpoints bool
-	adminUrlPathPrefix     string
+	adminPathPrefix        string
 }
 
 var DEFAULT_CONFIG = Config{
@@ -25,7 +25,7 @@ var DEFAULT_CONFIG = Config{
 	minSiteLength:          6,
 	siteSalt:               "",
 	createDefaultEndpoints: false,
-	adminUrlPathPrefix:     "/goslow",
+	adminPathPrefix:        "/goslow",
 }
 
 // NewConfigFromArgs returns a new config from command line arguments.
@@ -62,9 +62,9 @@ func (config *Config) defineFlags() {
 		`If true, then create default endpoints: 0.localhost:5103,
 	1.localhost:5103, ..., and 599.localhost:5103 before starting the server.`)
 
-	flag.StringVar(&config.adminUrlPathPrefix, "admin-url-path-prefix", DEFAULT_CONFIG.adminUrlPathPrefix,
+	flag.StringVar(&config.adminPathPrefix, "admin-path-prefix", DEFAULT_CONFIG.adminPathPrefix,
 		`If not an empty string: run in single domain mode
-	and use the endpoint http://LISTEN-ON/ADMIN-URL-PATH-PREFIX (default is http://localhost:5103/goslow)
+	and use the endpoint http://LISTEN-ON/ADMIN-PATH-PREFIX (default is http://localhost:5103/goslow)
 	to configurate responses`)
 }
 
@@ -73,8 +73,8 @@ func (config *Config) parseFlags() {
 }
 
 func (config *Config) validate() {
-	if config.createDefaultEndpoints && config.adminUrlPathPrefix != "" {
-		log.Fatal("You can't use both --admin-url-path-prefix and --create-default-endpoints options")
+	if config.createDefaultEndpoints && config.adminPathPrefix != "" {
+		log.Fatal("You can't use both --admin-path-prefix and --create-default-endpoints options")
 	}
 
 }

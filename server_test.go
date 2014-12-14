@@ -30,7 +30,7 @@ var DATA_SOURCE = map[string]string{
 
 type TestCase struct {
 	createDefaultEndpoints bool
-	adminUrlPathPrefix     string
+	adminPathPrefix        string
 	driver                 string
 	dataSource             string
 }
@@ -54,14 +54,14 @@ var (
 	}
 )
 
-func NewTestCase(createDefaultEndpoints bool, adminUrlPathPrefix string, driver string) *TestCase {
+func NewTestCase(createDefaultEndpoints bool, adminPathPrefix string, driver string) *TestCase {
 	dataSource, knownDriver := DATA_SOURCE[driver]
 	if driver != ANY_DB_DRIVER && !knownDriver {
 		log.Fatalf("unknown driver: <%s>", driver)
 	}
 	return &TestCase{
 		createDefaultEndpoints: createDefaultEndpoints,
-		adminUrlPathPrefix:     adminUrlPathPrefix,
+		adminPathPrefix:        adminPathPrefix,
 		driver:                 driver,
 		dataSource:             dataSource,
 	}
@@ -91,8 +91,8 @@ func all(testCases TestCases) TestCases {
 	allTestCases := make(TestCases, 0)
 	for _, testCase := range testCases {
 		if testCase.driver == ANY_DB_DRIVER {
-			sqlite3TestCase := NewTestCase(testCase.createDefaultEndpoints, testCase.adminUrlPathPrefix, "sqlite3")
-			postgresTestCase := NewTestCase(testCase.createDefaultEndpoints, testCase.adminUrlPathPrefix, "postgres")
+			sqlite3TestCase := NewTestCase(testCase.createDefaultEndpoints, testCase.adminPathPrefix, "sqlite3")
+			postgresTestCase := NewTestCase(testCase.createDefaultEndpoints, testCase.adminPathPrefix, "postgres")
 			allTestCases = append(allTestCases, sqlite3TestCase)
 			allTestCases = append(allTestCases, postgresTestCase)
 		} else {
@@ -129,7 +129,7 @@ func TestTooLargeDelay(t *testing.T) {
 }
 
 func checkTooLargeDelay(t *testing.T, server *httptest.Server, testCase *TestCase) {
-	prefix := testCase.adminUrlPathPrefix
+	prefix := testCase.adminPathPrefix
 	domain := newDomain(server, join(prefix, "/booya"), []byte("haha"))
 	site := getSite(domain)
 	resp := addRule(server, &Rule{Site: site, Delay: time.Duration(1000) * time.Second})
@@ -189,7 +189,7 @@ func TestRuleCreation(t *testing.T) {
 }
 
 func checkRuleCreationTestCase(t *testing.T, server *httptest.Server, testCase *TestCase) {
-	prefix := testCase.adminUrlPathPrefix
+	prefix := testCase.adminPathPrefix
 	isInSingleSiteMode := prefix != ""
 	domain, site := TEST_ENDPOINT, ""
 	root_body := []byte("haha")
@@ -231,7 +231,7 @@ func newSubDomainServer(testCase *TestCase) *Server {
 	config := DEFAULT_CONFIG // copies DEFAULT_CONFIG
 	config.endpoint = TEST_ENDPOINT
 	config.createDefaultEndpoints = testCase.createDefaultEndpoints
-	config.adminUrlPathPrefix = testCase.adminUrlPathPrefix
+	config.adminPathPrefix = testCase.adminPathPrefix
 	config.driver = testCase.driver
 	config.dataSource = testCase.dataSource
 	return NewServer(&config)

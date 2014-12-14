@@ -6,15 +6,15 @@ import (
 )
 
 type TemplateData struct {
-	Site               string
-	Path               string
-	Method             string
-	Delay              time.Duration
-	TruncatedBody      string
-	CreateDomain       string
-	Domain             string
-	AdminDomain        string
-	AdminUrlPathPrefix string
+	Site            string
+	Path            string
+	Method          string
+	Delay           time.Duration
+	TruncatedBody   string
+	CreateDomain    string
+	Domain          string
+	AdminDomain     string
+	adminPathPrefix string
 }
 
 // TODO: add helper to create templates easily
@@ -30,7 +30,7 @@ Let's say you want to add an endpoint {{ .Path }}
 and you want it to respond to GET requests with "{{ .TruncatedBody }}" and 2.5 seconds delay.
 
 Just make a POST request to your admin domain ...
-curl -d "{{ .TruncatedBody }}" "{{ .AdminDomain }}{{ .AdminUrlPathPrefix }}{{ .Path }}?delay=2.5&method=GET"
+curl -d "{{ .TruncatedBody }}" "{{ .AdminDomain }}{{ .adminPathPrefix }}{{ .Path }}?delay=2.5&method=GET"
 
 ... and you're done!
 `))
@@ -39,7 +39,7 @@ curl -d "{{ .TruncatedBody }}" "{{ .AdminDomain }}{{ .AdminUrlPathPrefix }}{{ .P
 	CREATE_SITE_EXAMPLE_TEMPLATE = template.Must(template.New("create site example").Parse(
 		`Example:
 To create a new site make a POST request ...
-curl -d "{{ .TruncatedBody }}" "{{ .CreateDomain }}{{ .AdminUrlPathPrefix }}{{ .Path }}?delay=2.5&method=GET"
+curl -d "{{ .TruncatedBody }}" "{{ .CreateDomain }}{{ .adminPathPrefix }}{{ .Path }}?delay=2.5&method=GET"
 ... and you're done!
 `))
 

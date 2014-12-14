@@ -149,7 +149,7 @@ func (server *Server) isCreateSite(req *http.Request) bool {
 }
 
 func (server *Server) isInSingleSiteMode() bool {
-	return server.config.adminUrlPathPrefix != ""
+	return server.config.adminPathPrefix != ""
 }
 
 func getSubdomain(url string) string {
@@ -307,15 +307,15 @@ func (server *Server) showLongCreateSiteHelp(w http.ResponseWriter, rule *Rule) 
 
 func (server *Server) makeTemplateData(rule *Rule) *TemplateData {
 	return &TemplateData{
-		Site:               rule.Site,
-		Path:               rule.Path,
-		Method:             rule.Method,
-		Delay:              rule.Delay,
-		TruncatedBody:      truncate(string(rule.Body), 80),
-		CreateDomain:       server.makeFullDomain(CREATE_SUBDOMAIN_NAME),
-		Domain:             server.makeFullDomain(rule.Site),
-		AdminDomain:        server.makeAdminDomain(rule.Site),
-		AdminUrlPathPrefix: server.config.adminUrlPathPrefix,
+		Site:            rule.Site,
+		Path:            rule.Path,
+		Method:          rule.Method,
+		Delay:           rule.Delay,
+		TruncatedBody:   truncate(string(rule.Body), 80),
+		CreateDomain:    server.makeFullDomain(CREATE_SUBDOMAIN_NAME),
+		Domain:          server.makeFullDomain(rule.Site),
+		AdminDomain:     server.makeAdminDomain(rule.Site),
+		adminPathPrefix: server.config.adminPathPrefix,
 	}
 }
 
@@ -343,7 +343,7 @@ func (server *Server) makeAdminDomain(site string) string {
 
 func (server *Server) makeAdminPath(site string) string {
 	adminDomain := server.makeAdminDomain(site)
-	return adminDomain + server.config.adminUrlPathPrefix
+	return adminDomain + server.config.adminPathPrefix
 }
 
 func (server *Server) makeExampleRule(rule *Rule) *Rule {
@@ -377,7 +377,7 @@ func (server *Server) isAddRule(req *http.Request) bool {
 }
 
 func (server *Server) isAddRulePath(path string) bool {
-	adminPath := server.config.adminUrlPathPrefix
+	adminPath := server.config.adminPathPrefix
 	if !strings.HasPrefix(path, adminPath) {
 		return false
 	}
@@ -439,7 +439,7 @@ func isDefault(site string) bool {
 
 func (server *Server) getRulePath(req *http.Request) string {
 	if server.isInSingleSiteMode() {
-		path := strings.TrimPrefix(req.URL.Path, server.config.adminUrlPathPrefix)
+		path := strings.TrimPrefix(req.URL.Path, server.config.adminPathPrefix)
 		return ensureHasPrefix(path, "/")
 	}
 	return req.URL.Path
