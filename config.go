@@ -45,7 +45,9 @@ func (config *Config) defineFlags() {
 		`url at which this instance of goslow is visible to the world.
 	Used only in response texts, doesn't affect the listening address. E.g: goslow.link`)
 
-	flag.StringVar(&config.driver, "driver", DEFAULT_CONFIG.driver,
+	// attention: cmd arg is called --db to avoid exposing golang
+	// lingo to the public interface
+	flag.StringVar(&config.driver, "db", DEFAULT_CONFIG.driver,
 		"database driver. Possible values: sqlite3, postgres.")
 
 	flag.StringVar(&config.dataSource, "data-source", DEFAULT_CONFIG.dataSource,

@@ -179,18 +179,18 @@ Response is: {"local": "response"}
 
 
 By default goslow stores endpoint data in memory. This means that any endpoint you add will be lost after restart.
-If you want to use a persistent storage, then you need to specify *--driver* and *--data-source* options.
+If you want to use a persistent storage, then you need to specify *--db* and *--data-source* options.
 
 Goslow supports sqlite3:
 ```shell
-./goslow --driver sqlite3 --data-source /path/to/sqlite3/db/file
-# actually, sqlite3 is the default driver, so this'll do:
+./goslow --db sqlite3 --data-source /path/to/sqlite3/db/file
+# actually, sqlite3 is the default db, so this'll do:
 # ./goslow --data-source /path/to/sqlite3/db/file
 ```
 
 and postgres:
 ```shell
-./goslow --driver postgres --data-source postgres://user@host/dbname
+./goslow --db postgres --data-source postgres://user@host/dbname
 # prefix 'postgres://' is required
 ```
 
