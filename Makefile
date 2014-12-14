@@ -1,3 +1,8 @@
+# TODO: check that LICENSE contains the correct year
+# TODO: make targets to run without CDs
+# TODO: use ansible whenever possible
+# TODO: refactor it
+
 deploy: github remote_test remote_linux ansible check_output
 	true
 
