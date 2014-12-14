@@ -149,7 +149,7 @@ func (server *Server) isCreateSite(req *http.Request) bool {
 }
 
 func (server *Server) isInSingleSiteMode() bool {
-	return server.config.adminPathPrefix != ""
+	return server.config.isInSingleSiteMode()
 }
 
 func getSubdomain(url string) string {
