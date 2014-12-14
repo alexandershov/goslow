@@ -8,7 +8,7 @@ import (
 // Config stores command line arguments.
 type Config struct {
 	listenOn               string
-	deployedOn             string
+	deployedOn             string // doesn't affect the listening address, used in help texts only
 	driver                 string
 	dataSource             string
 	minSiteLength          int
