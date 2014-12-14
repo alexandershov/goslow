@@ -7,13 +7,18 @@ import (
 	"runtime"
 )
 
-// main starts a slow HTTP server that responds with errors.
+// main starts a server.
 func main() {
-	// GOMAXPROCS call is ignored if NumCPU returns 1 (GOMAXPROCS(0) doesn't change anything)
-	runtime.GOMAXPROCS(runtime.NumCPU() / 2)
+	useSeveralCPU()
 
 	config := NewConfigFromArgs()
 	server := NewServer(config)
 
 	log.Fatal(server.ListenAndServe())
+}
+
+func useSeveralCPU() {
+	if runtime.NumCPU() > 1 {
+		runtime.GOMAXPROCS(runtime.NumCPU() / 2)
+	}
 }
