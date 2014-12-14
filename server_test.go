@@ -44,7 +44,7 @@ var (
 		NewTestCase(true, "", ANY_DB_DRIVER),
 	}
 
-	ruleCreationTestCases = TestCases{
+	endpointCreationTestCases = TestCases{
 		NewTestCase(true, "", ANY_DB_DRIVER),
 		NewTestCase(false, "/goslow", ANY_DB_DRIVER),
 		NewTestCase(false, "/goslow/", ANY_DB_DRIVER),
@@ -132,7 +132,7 @@ func checkTooLargeDelay(t *testing.T, server *httptest.Server, testCase *TestCas
 	prefix := testCase.adminPathPrefix
 	domain := newDomain(server, join(prefix, "/booya"), []byte("haha"))
 	site := getSite(domain)
-	resp := addRule(server, &Rule{Site: site, Delay: time.Duration(1000) * time.Second})
+	resp := addEndpoint(server, &Endpoint{Site: site, Delay: time.Duration(1000) * time.Second})
 	shouldHaveStatusCode(t, http.StatusBadRequest, resp)
 	resp = GET(server.URL, "/", domain)
 	shouldHaveStatusCode(t, http.StatusNotFound, resp)
@@ -144,7 +144,7 @@ func TestRedefineBuiltinSites(t *testing.T) {
 
 func checkRedefineBuiltinSites(t *testing.T, server *httptest.Server, testCase *TestCase) {
 	for _, site := range []string{"0", "99", "500", "create"} {
-		resp := addRule(server, &Rule{Site: site, Path: "/test", Body: []byte("hop"), Method: "GET"})
+		resp := addEndpoint(server, &Endpoint{Site: site, Path: "/test", Body: []byte("hop"), Method: "GET"})
 		shouldHaveStatusCode(t, http.StatusForbidden, resp)
 	}
 }
@@ -155,7 +155,7 @@ func TestRedefineNonExistentSite(t *testing.T) {
 
 func checkRedefineNonExistentSite(t *testing.T, server *httptest.Server, testCase *TestCase) {
 	for _, site := range []string{"", "ha", "admin-500"} {
-		resp := addRule(server, &Rule{Site: site})
+		resp := addEndpoint(server, &Endpoint{Site: site})
 		shouldHaveStatusCode(t, http.StatusNotFound, resp)
 	}
 }
@@ -184,11 +184,11 @@ func checkStatus(t *testing.T, server *httptest.Server, testCase *TestCase) {
 	}
 }
 
-func TestRuleCreation(t *testing.T) {
-	runAll(t, checkRuleCreationTestCase, ruleCreationTestCases)
+func TestEndpointCreation(t *testing.T) {
+	runAll(t, checkEndpointCreationTestCase, endpointCreationTestCases)
 }
 
-func checkRuleCreationTestCase(t *testing.T, server *httptest.Server, testCase *TestCase) {
+func checkEndpointCreationTestCase(t *testing.T, server *httptest.Server, testCase *TestCase) {
 	prefix := testCase.adminPathPrefix
 	isInSingleSiteMode := prefix != ""
 	domain, site := TEST_DEPLOYED_ON, ""
@@ -198,7 +198,7 @@ func checkRuleCreationTestCase(t *testing.T, server *httptest.Server, testCase *
 	empty_payload := []byte("")
 
 	if isInSingleSiteMode {
-		resp := addRule(server, &Rule{Path: join(prefix, "/"), Body: root_body})
+		resp := addEndpoint(server, &Endpoint{Path: join(prefix, "/"), Body: root_body})
 		shouldHaveStatusCode(t, http.StatusOK, resp)
 	} else {
 		domain = newDomain(server, join(prefix, "/"), root_body)
@@ -207,22 +207,22 @@ func checkRuleCreationTestCase(t *testing.T, server *httptest.Server, testCase *
 
 	bytesShouldBeEqual(t, readBody(GET(server.URL, "/", domain)), root_body)
 
-	// testing GET rule
-	resp := addRule(server, &Rule{Site: site, Path: join(prefix, "/test"), Body: test_body, Method: "GET"})
+	// testing GET endpoint
+	resp := addEndpoint(server, &Endpoint{Site: site, Path: join(prefix, "/test"), Body: test_body, Method: "GET"})
 	shouldHaveStatusCode(t, http.StatusOK, resp)
-	// checking that GET /test rule works
+	// checking that GET /test endpoint works
 	bytesShouldBeEqual(t, readBody(GET(server.URL, "/test", domain)), test_body)
 	// checking that GET /test doesn't affect POST
 	resp = POST(server.URL, "/test", domain, []byte(""))
 	intShouldBeEqual(t, 404, resp.StatusCode)
 
-	// testing POST rule
-	resp = addRule(server, &Rule{Site: site, Path: join(prefix, "/test"), Body: test_post_body, Method: "POST",
+	// testing POST endpoint
+	resp = addEndpoint(server, &Endpoint{Site: site, Path: join(prefix, "/test"), Body: test_post_body, Method: "POST",
 		Delay: time.Duration(100) * time.Millisecond})
 	shouldHaveStatusCode(t, http.StatusOK, resp)
-	// checking that POST rule doesn't affect GET
+	// checking that POST endpoint doesn't affect GET
 	bytesShouldBeEqual(t, readBody(GET(server.URL, "/test", domain)), test_body)
-	// checking that POST /test rule works
+	// checking that POST /test endpoint works
 	bytesShouldBeEqual(t, readBody(POST(server.URL, "/test", domain, empty_payload)), test_post_body)
 	shouldRespondIn(t, createPOST(server.URL, "/test", domain, empty_payload), 0.1, 0.15)
 }
@@ -327,17 +327,17 @@ func getSite(domain string) string {
 	return strings.Split(domain, ".")[0]
 }
 
-func addRule(server *httptest.Server, rule *Rule) *http.Response {
-	req := createPOST(server.URL, rule.Path, makeHost("admin-"+rule.Site, TEST_DEPLOYED_ON),
-		rule.Body)
-	req.URL.RawQuery = getQueryString(rule)
+func addEndpoint(server *httptest.Server, endpoint *Endpoint) *http.Response {
+	req := createPOST(server.URL, endpoint.Path, makeHost("admin-"+endpoint.Site, TEST_DEPLOYED_ON),
+		endpoint.Body)
+	req.URL.RawQuery = getQueryString(endpoint)
 	return do(req)
 }
 
-func getQueryString(rule *Rule) string {
+func getQueryString(endpoint *Endpoint) string {
 	params := url.Values{}
-	params.Set("method", rule.Method)
-	params.Set("delay", fmt.Sprintf("%f", rule.Delay.Seconds()))
+	params.Set("method", endpoint.Method)
+	params.Set("delay", fmt.Sprintf("%f", endpoint.Delay.Seconds()))
 	return params.Encode()
 }
 

@@ -33,36 +33,36 @@ func NewStorage(driver string, dataSource string) (*Storage, error) {
 	return storage, err
 }
 
-// Storage.FindRuleMatching returns a rule matching a given site and HTTP request.
-func (storage *Storage) FindRuleMatching(site string, req *http.Request) (rule *Rule, found bool, err error) {
-	rules, err := storage.getRules(site)
+// Storage.FindEndpointMatching returns a endpoint matching a given site and HTTP request.
+func (storage *Storage) FindEndpointMatching(site string, req *http.Request) (endpoint *Endpoint, found bool, err error) {
+	endpoints, err := storage.getEndpoints(site)
 	if err != nil {
 		return nil, false, err
 	}
-	for _, rule := range rules {
-		if rule.Matches(req) {
-			return rule, true, nil
+	for _, endpoint := range endpoints {
+		if endpoint.Matches(req) {
+			return endpoint, true, nil
 		}
 	}
 	return nil, false, nil
 }
 
-func (storage *Storage) getRules(site string) ([]*Rule, error) {
-	rules := make([]*Rule, 0)
-	rows, err := storage.db.Query(storage.dialectify(GET_SITE_RULES_SQL), site)
+func (storage *Storage) getEndpoints(site string) ([]*Endpoint, error) {
+	endpoints := make([]*Endpoint, 0)
+	rows, err := storage.db.Query(storage.dialectify(GET_SITE_ENDPOINTS_SQL), site)
 	if err != nil {
-		return rules, err
+		return endpoints, err
 	}
 	defer rows.Close()
 
 	for rows.Next() {
-		rule, err := makeRule(rows)
+		endpoint, err := makeEndpoint(rows)
 		if err != nil {
-			return rules, err
+			return endpoints, err
 		}
-		rules = append(rules, rule)
+		endpoints = append(endpoints, endpoint)
 	}
-	return rules, rows.Err()
+	return endpoints, rows.Err()
 }
 
 func (storage *Storage) dialectify(sql string) string {
@@ -84,18 +84,18 @@ func (storage *Storage) dialectifySchema(sql string) string {
 	return strings.Replace(sql, " BYTEA,", " BLOB,", -1)
 }
 
-func makeRule(rows *sql.Rows) (*Rule, error) {
-	rule := new(Rule)
+func makeEndpoint(rows *sql.Rows) (*Endpoint, error) {
+	endpoint := new(Endpoint)
 	var headersJson string
 	var delay int64
-	err := rows.Scan(&rule.Site, &rule.Path, &rule.Method, &headersJson, &delay,
-		&rule.StatusCode, &rule.Body)
+	err := rows.Scan(&endpoint.Site, &endpoint.Path, &endpoint.Method, &headersJson, &delay,
+		&endpoint.StatusCode, &endpoint.Body)
 	if err != nil {
-		return rule, err
+		return endpoint, err
 	}
-	rule.Delay = time.Duration(delay)
-	rule.Headers, err = jsonToStringMap(headersJson)
-	return rule, err
+	endpoint.Delay = time.Duration(delay)
+	endpoint.Headers, err = jsonToStringMap(headersJson)
+	return endpoint, err
 }
 
 func jsonToStringMap(js string) (map[string]string, error) {
@@ -120,9 +120,9 @@ func objectToStringMap(object map[string]interface{}) (map[string]string, error)
 	return m, nil
 }
 
-// Storage.SaveRule saves a given rule into the database.
-// If the rule doesn't exist in a database, Storage.SaveRule creates a new rule.
-func (storage *Storage) SaveRule(rule *Rule) error {
+// Storage.SaveEndpoint saves a given endpoint into the database.
+// If the endpoint doesn't exist in a database, Storage.SaveEndpoint creates a new endpoint.
+func (storage *Storage) SaveEndpoint(endpoint *Endpoint) error {
 	tx, err := storage.db.Begin()
 	if err != nil {
 		return err
@@ -131,18 +131,18 @@ func (storage *Storage) SaveRule(rule *Rule) error {
 	// if there's some error, then we always want to rollback
 	defer tx.Rollback()
 	// upsert as delete-n-insert isn't correct in all cases
-	// (e.g concurrent upserts of the same rule will lead to "duplicate key value violates unique constraint")
-	// but is practical enough because concurrent upserts of the same rule are going to be extremely rare
-	_, err = tx.Exec(storage.dialectify(DELETE_RULE_SQL), rule.Site, rule.Path, rule.Method)
+	// (e.g concurrent upserts of the same endpoint will lead to "duplicate key value violates unique constraint")
+	// but is practical enough because concurrent upserts of the same endpoint are going to be extremely rare
+	_, err = tx.Exec(storage.dialectify(DELETE_ENDPOINT_SQL), endpoint.Site, endpoint.Path, endpoint.Method)
 	if err != nil {
 		return err
 	}
-	headersJson, err := stringMapToJson(rule.Headers)
+	headersJson, err := stringMapToJson(endpoint.Headers)
 	if err != nil {
 		return err
 	}
-	_, err = tx.Exec(storage.dialectify(INSERT_RULE_SQL), rule.Site, rule.Path, rule.Method,
-		headersJson, int64(rule.Delay), rule.StatusCode, rule.Body)
+	_, err = tx.Exec(storage.dialectify(INSERT_ENDPOINT_SQL), endpoint.Site, endpoint.Path, endpoint.Method,
+		headersJson, int64(endpoint.Delay), endpoint.StatusCode, endpoint.Body)
 	if err != nil {
 		return err
 	}

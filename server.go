@@ -34,8 +34,8 @@ const (
 )
 
 const (
-	CREATE_SUBDOMAIN_NAME     = "create"
-	ADD_RULE_SUBDOMAIN_PREFIX = "admin-"
+	CREATE_SUBDOMAIN_NAME         = "create"
+	ADD_ENDPOINT_SUBDOMAIN_PREFIX = "admin-"
 )
 
 var (
@@ -55,7 +55,7 @@ const (
 )
 
 // Server listens on the address specified by the config,
-// stores rules in the storage, and generates new site names
+// stores endpoints in the storage, and generates new site names
 // with the hasher.
 type Server struct {
 	config  *Config
@@ -104,12 +104,12 @@ func (server *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	case server.isCreateSite(req):
 		err = server.handleCreateSite(w, req)
 
-	case server.isAddRule(req):
-		err = server.handleAddRule(w, req)
+	case server.isAddEndpoint(req):
+		err = server.handleAddEndpoint(w, req)
 
 	default:
 		allowCrossDomainRequests(w, req)
-		err = server.respondFromRule(w, req)
+		err = server.respondFromEndpoint(w, req)
 	}
 	if err != nil {
 		server.handleError(err, w)
@@ -162,14 +162,14 @@ func (server *Server) handleCreateSite(w http.ResponseWriter, req *http.Request)
 	if err != nil {
 		return err
 	}
-	rule, err := server.addRule(site, req)
+	endpoint, err := server.addEndpoint(site, req)
 	if err != nil {
 		return err
 	}
 	if wantsShortResponse(req) {
-		server.showShortCreateSiteHelp(w, rule)
+		server.showShortCreateSiteHelp(w, endpoint)
 	} else {
-		server.showLongCreateSiteHelp(w, rule)
+		server.showLongCreateSiteHelp(w, endpoint)
 	}
 	return nil
 }
@@ -200,27 +200,27 @@ func generateUniqueNumbers() []int {
 	return []int{seconds, milliseconds}
 }
 
-func (server *Server) addRule(site string, req *http.Request) (*Rule, error) {
-	rule, err := server.makeRule(site, req)
+func (server *Server) addEndpoint(site string, req *http.Request) (*Endpoint, error) {
+	endpoint, err := server.makeEndpoint(site, req)
 	if err != nil {
 		return nil, err
 	}
-	err = server.storage.SaveRule(rule)
-	return rule, err
+	err = server.storage.SaveEndpoint(endpoint)
+	return endpoint, err
 }
 
-func (server *Server) makeRule(site string, req *http.Request) (*Rule, error) {
+func (server *Server) makeEndpoint(site string, req *http.Request) (*Endpoint, error) {
 	values, err := url.ParseQuery(req.URL.RawQuery)
 	if err != nil {
 		return nil, err
 	}
-	path := server.getRulePath(req)
-	method := server.getRuleMethod(values)
-	delay, err := server.getRuleDelay(values)
+	path := server.getEndpointPath(req)
+	method := server.getEndpointMethod(values)
+	delay, err := server.getEndpointDelay(values)
 	if err != nil {
 		return nil, err
 	}
-	statusCode, err := server.getRuleStatusCode(values)
+	statusCode, err := server.getEndpointStatusCode(values)
 	if err != nil {
 		return nil, err
 	}
@@ -228,7 +228,7 @@ func (server *Server) makeRule(site string, req *http.Request) (*Rule, error) {
 	if err != nil {
 		return nil, err
 	}
-	rule := &Rule{
+	endpoint := &Endpoint{
 		Site:       site,
 		Path:       path,
 		Method:     method,
@@ -237,10 +237,10 @@ func (server *Server) makeRule(site string, req *http.Request) (*Rule, error) {
 		StatusCode: statusCode,
 		Body:       body,
 	}
-	return rule, nil
+	return endpoint, nil
 }
 
-func (server *Server) getRuleDelay(values url.Values) (time.Duration, error) {
+func (server *Server) getEndpointDelay(values url.Values) (time.Duration, error) {
 	_, contains := values[DELAY_PARAM]
 	if !contains {
 		return DEFAULT_DELAY, nil
@@ -257,7 +257,7 @@ func (server *Server) getRuleDelay(values url.Values) (time.Duration, error) {
 	return delay, nil
 }
 
-func (server *Server) getRuleStatusCode(values url.Values) (int, error) {
+func (server *Server) getEndpointStatusCode(values url.Values) (int, error) {
 	_, contains := values[STATUS_CODE_PARAM]
 	if !contains {
 		return DEFAULT_STATUS_CODE, nil
@@ -265,7 +265,7 @@ func (server *Server) getRuleStatusCode(values url.Values) (int, error) {
 	return strconv.Atoi(values.Get(STATUS_CODE_PARAM))
 }
 
-func (server *Server) getRuleMethod(values url.Values) string {
+func (server *Server) getEndpointMethod(values url.Values) string {
 	return values.Get(METHOD_PARAM)
 }
 
@@ -293,30 +293,30 @@ func wantsShortResponse(req *http.Request) bool {
 	return values.Get("output") == "short"
 }
 
-func (server *Server) showShortCreateSiteHelp(w http.ResponseWriter, rule *Rule) {
-	fmt.Fprint(w, server.makeFullDomain(rule.Site))
+func (server *Server) showShortCreateSiteHelp(w http.ResponseWriter, endpoint *Endpoint) {
+	fmt.Fprint(w, server.makeFullDomain(endpoint.Site))
 }
 
-func (server *Server) showLongCreateSiteHelp(w http.ResponseWriter, rule *Rule) {
-	templateData := server.makeTemplateData(rule)
+func (server *Server) showLongCreateSiteHelp(w http.ResponseWriter, endpoint *Endpoint) {
+	templateData := server.makeTemplateData(endpoint)
 	BANNER_TEMPLATE.Execute(w, nil)
-	RULE_ADDED_TEMPLATE.Execute(w, templateData)
+	ENDPOINT_ADDED_TEMPLATE.Execute(w, templateData)
 	fmt.Fprintln(w)
 	SITE_CREATED_TEMPLATE.Execute(w, templateData)
 	fmt.Fprintln(w)
-	ADD_RULE_EXAMPLE_TEMPLATE.Execute(w, server.makeTemplateData(server.makeExampleRule(rule)))
+	ADD_ENDPOINT_EXAMPLE_TEMPLATE.Execute(w, server.makeTemplateData(server.makeExampleEndpoint(endpoint)))
 }
 
-func (server *Server) makeTemplateData(rule *Rule) *TemplateData {
+func (server *Server) makeTemplateData(endpoint *Endpoint) *TemplateData {
 	return &TemplateData{
-		Site:            rule.Site,
-		Path:            rule.Path,
-		Method:          rule.Method,
-		Delay:           rule.Delay,
-		TruncatedBody:   truncate(string(rule.Body), 80),
+		Site:            endpoint.Site,
+		Path:            endpoint.Path,
+		Method:          endpoint.Method,
+		Delay:           endpoint.Delay,
+		TruncatedBody:   truncate(string(endpoint.Body), 80),
 		CreateDomain:    server.makeFullDomain(CREATE_SUBDOMAIN_NAME),
-		Domain:          server.makeFullDomain(rule.Site),
-		AdminDomain:     server.makeAdminDomain(rule.Site),
+		Domain:          server.makeFullDomain(endpoint.Site),
+		AdminDomain:     server.makeAdminDomain(endpoint.Site),
 		adminPathPrefix: server.config.adminPathPrefix,
 	}
 }
@@ -348,37 +348,37 @@ func (server *Server) makeAdminPath(site string) string {
 	return adminDomain + server.config.adminPathPrefix
 }
 
-func (server *Server) makeExampleRule(rule *Rule) *Rule {
-	example := *rule // make a copy
+func (server *Server) makeExampleEndpoint(endpoint *Endpoint) *Endpoint {
+	example := *endpoint // make a copy
 	example.Path = "/christmas"
 	example.Body = []byte("hohoho")
 	return &example
 }
 
-func (server *Server) respondFromRule(w http.ResponseWriter, req *http.Request) error {
-	rule, found, err := server.storage.FindRuleMatching(server.getSite(req), req)
+func (server *Server) respondFromEndpoint(w http.ResponseWriter, req *http.Request) error {
+	endpoint, found, err := server.storage.FindEndpointMatching(server.getSite(req), req)
 	if err != nil {
 		return err
 	}
 	if found {
-		applyRule(rule, w)
+		applyEndpoint(endpoint, w)
 	} else {
 		return server.handleUnknownEndpoint(w, req)
 	}
 	return nil
 }
 
-func (server *Server) isAddRule(req *http.Request) bool {
+func (server *Server) isAddEndpoint(req *http.Request) bool {
 	if req.Method != "POST" {
 		return false
 	}
 	if server.isInSingleSiteMode() {
-		return server.isAddRulePath(req.URL.Path)
+		return server.isAddEndpointPath(req.URL.Path)
 	}
-	return strings.HasPrefix(getSubdomain(req.Host), ADD_RULE_SUBDOMAIN_PREFIX)
+	return strings.HasPrefix(getSubdomain(req.Host), ADD_ENDPOINT_SUBDOMAIN_PREFIX)
 }
 
-func (server *Server) isAddRulePath(path string) bool {
+func (server *Server) isAddEndpointPath(path string) bool {
 	adminPath := server.config.adminPathPrefix
 	if !strings.HasPrefix(path, adminPath) {
 		return false
@@ -390,7 +390,7 @@ func (server *Server) isAddRulePath(path string) bool {
 	return suffix == "" || suffix[0] == '?' || suffix[0] == '/'
 }
 
-func (server *Server) handleAddRule(w http.ResponseWriter, req *http.Request) error {
+func (server *Server) handleAddEndpoint(w http.ResponseWriter, req *http.Request) error {
 	site := server.getSite(req)
 	if isBuiltin(site) {
 		return ChangeBuiltinSiteError()
@@ -403,12 +403,12 @@ func (server *Server) handleAddRule(w http.ResponseWriter, req *http.Request) er
 		// TODO: show a long help text here (like in handleUnknownEndpoint)
 		return UnknownSiteError(site)
 	}
-	rule, err := server.addRule(site, req)
+	endpoint, err := server.addEndpoint(site, req)
 	if err != nil {
 		return err
 	}
 	BANNER_TEMPLATE.Execute(w, nil)
-	RULE_ADDED_TEMPLATE.Execute(w, server.makeTemplateData(rule))
+	ENDPOINT_ADDED_TEMPLATE.Execute(w, server.makeTemplateData(endpoint))
 	return nil
 }
 
@@ -417,8 +417,8 @@ func (server *Server) getSite(req *http.Request) string {
 		return EMPTY_SITE
 	}
 	subdomain := getSubdomain(req.Host)
-	if server.isAddRule(req) {
-		return strings.TrimPrefix(subdomain, ADD_RULE_SUBDOMAIN_PREFIX)
+	if server.isAddEndpoint(req) {
+		return strings.TrimPrefix(subdomain, ADD_ENDPOINT_SUBDOMAIN_PREFIX)
 	}
 	return subdomain
 }
@@ -439,7 +439,7 @@ func isDefault(site string) bool {
 	return i <= MAX_STATUS_CODE
 }
 
-func (server *Server) getRulePath(req *http.Request) string {
+func (server *Server) getEndpointPath(req *http.Request) string {
 	if server.isInSingleSiteMode() {
 		path := strings.TrimPrefix(req.URL.Path, server.config.adminPathPrefix)
 		return ensureHasPrefix(path, "/")
@@ -454,11 +454,11 @@ func ensureHasPrefix(s, prefix string) string {
 	return s
 }
 
-func applyRule(rule *Rule, w http.ResponseWriter) {
-	time.Sleep(rule.Delay)
-	addHeaders(rule.Headers, w.Header())
-	w.WriteHeader(rule.StatusCode)
-	w.Write(rule.Body)
+func applyEndpoint(endpoint *Endpoint, w http.ResponseWriter) {
+	time.Sleep(endpoint.Delay)
+	addHeaders(endpoint.Headers, w.Header())
+	w.WriteHeader(endpoint.StatusCode)
+	w.Write(endpoint.Body)
 }
 
 func addHeaders(headers map[string]string, responseHeader http.Header) {
@@ -476,8 +476,8 @@ func (server *Server) handleUnknownEndpoint(w http.ResponseWriter, req *http.Req
 		return err
 	}
 
-	rule := &Rule{Site: site, Path: server.getRulePath(req)}
-	templateData := server.makeTemplateData(rule)
+	endpoint := &Endpoint{Site: site, Path: server.getEndpointPath(req)}
+	templateData := server.makeTemplateData(endpoint)
 
 	BANNER_TEMPLATE.Execute(w, nil)
 
@@ -487,7 +487,7 @@ func (server *Server) handleUnknownEndpoint(w http.ResponseWriter, req *http.Req
 		exampleTemplateData.TruncatedBody = "hohoho"
 		// TODO: why do we need both templateData and exampleTemplateData?
 		UNKNOWN_ENDPOINT_TEMPLATE.Execute(w, templateData)
-		ADD_RULE_EXAMPLE_TEMPLATE.Execute(w, exampleTemplateData)
+		ADD_ENDPOINT_EXAMPLE_TEMPLATE.Execute(w, exampleTemplateData)
 
 	case isCreate(site):
 		exampleTemplateData := *templateData
@@ -511,7 +511,7 @@ func (server *Server) handleUnknownEndpoint(w http.ResponseWriter, req *http.Req
 		exampleTemplateData.TruncatedBody = "hohoho"
 		// TODO: why do we need both templateData and exampleTemplateData?
 		UNKNOWN_ENDPOINT_TEMPLATE.Execute(w, templateData)
-		ADD_RULE_EXAMPLE_TEMPLATE.Execute(w, exampleTemplateData)
+		ADD_ENDPOINT_EXAMPLE_TEMPLATE.Execute(w, exampleTemplateData)
 	}
 	return nil
 }
@@ -528,7 +528,7 @@ func (server *Server) createSitesInRange(minSite, maxSite int) {
 		if err != nil {
 			log.Fatal(err)
 		}
-		rule := &Rule{
+		endpoint := &Endpoint{
 			Site:       site,
 			Path:       ANY,
 			Method:     ANY,
@@ -537,7 +537,7 @@ func (server *Server) createSitesInRange(minSite, maxSite int) {
 			StatusCode: server.statusFor(i),
 			Body:       DEFAULT_BODY,
 		}
-		err = server.storage.SaveRule(rule)
+		err = server.storage.SaveEndpoint(endpoint)
 		if err != nil {
 			log.Fatal(err)
 		}

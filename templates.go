@@ -24,7 +24,7 @@ var (
 		`===================== goslow ====================
 `))
 
-	ADD_RULE_EXAMPLE_TEMPLATE = template.Must(template.New("add rule example").Parse(
+	ADD_ENDPOINT_EXAMPLE_TEMPLATE = template.Must(template.New("add endpoint example").Parse(
 		`Example:
 Let's say you want to add an endpoint {{ .Path }}
 and you want it to respond to GET requests with "{{ .TruncatedBody }}" and 2.5 seconds delay.
@@ -35,7 +35,7 @@ curl -d "{{ .TruncatedBody }}" "{{ .AdminDomain }}{{ .adminPathPrefix }}{{ .Path
 ... and you're done!
 `))
 
-	// TODO: remove duplication with ADD_RULE_EXAMPLE_TEMPLATE
+	// TODO: remove duplication with ADD_ENDPOINT_EXAMPLE_TEMPLATE
 	CREATE_SITE_EXAMPLE_TEMPLATE = template.Must(template.New("create site example").Parse(
 		`Example:
 To create a new site make a POST request ...
@@ -48,7 +48,7 @@ curl -d "{{ .TruncatedBody }}" "{{ .CreateDomain }}{{ .adminPathPrefix }}{{ .Pat
 You can configure it with POST requests to {{ .AdminDomain }}
 `))
 
-	RULE_ADDED_TEMPLATE = template.Must(template.New("rule added").Parse(
+	ENDPOINT_ADDED_TEMPLATE = template.Must(template.New("endpoint added").Parse(
 		`Hooray!
 Endpoint http://{{ .Domain }}{{ .Path }} responds to {{if .Method }}{{ .Method }}{{else}}any HTTP method{{ end }} {{ if .Delay }}with {{ .Delay }} delay{{ else }}without any delay{{end}}.
 Response is: {{ if .TruncatedBody }}{{ .TruncatedBody }}{{ else }}<EMPTY>{{ end }}

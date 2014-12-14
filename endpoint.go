@@ -5,8 +5,8 @@ import (
 	"time"
 )
 
-// Rule describes path/HTTP/delay properties of the endpoint.
-type Rule struct {
+// Endpoint describes path/HTTP/delay properties of the endpoint.
+type Endpoint struct {
 	Site       string
 	Path       string
 	Method     string
@@ -16,9 +16,9 @@ type Rule struct {
 	Body       []byte
 }
 
-// Rule.Matches returns true if rule matches a given request.
-func (rule *Rule) Matches(req *http.Request) bool {
-	return matches(rule.Path, req.URL.Path) && matches(rule.Method, req.Method)
+// Endpoint.Matches returns true if endpoint matches a given request.
+func (endpoint *Endpoint) Matches(req *http.Request) bool {
+	return matches(endpoint.Path, req.URL.Path) && matches(endpoint.Method, req.Method)
 }
 
 // matches returns true if pattern matches the name. Empty pattern matches anything.

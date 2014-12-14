@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS sites(
   site TEXT PRIMARY KEY
 );
 
-CREATE TABLE IF NOT EXISTS rules (
+CREATE TABLE IF NOT EXISTS endpoints (
   site TEXT, path TEXT, method TEXT, headers TEXT,
   delay BIGINT, status_code INT, body BYTEA,
   PRIMARY KEY(site, path, method),
@@ -19,20 +19,20 @@ CREATE TABLE IF NOT EXISTS rules (
 );
 `
 
-	DELETE_RULE_SQL = `
-DELETE FROM rules
+	DELETE_ENDPOINT_SQL = `
+DELETE FROM endpoints
 WHERE site = $1 AND path = $2 AND method = $3
 `
 
-	INSERT_RULE_SQL = `
-INSERT INTO rules
+	INSERT_ENDPOINT_SQL = `
+INSERT INTO endpoints
 (site, path, method, headers, delay, status_code, body)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
 `
 
-	GET_SITE_RULES_SQL = `
+	GET_SITE_ENDPOINTS_SQL = `
 SELECT site, path, method, headers, delay, status_code, body
-FROM rules
+FROM endpoints
 WHERE site = $1
 ORDER BY LENGTH(path) DESC, LENGTH(method) DESC
 `
