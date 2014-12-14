@@ -104,7 +104,7 @@ End of quick aside.
 
 You can add new endpoints to your personal domain by POSTing to *admin-5wx55yijr.goslow.link*
 
-Simple rule. Want an endpoint 5wx55yijr.goslow.link/your-path to respond with **your-response**? Post **your-response** to admin-5wx55yijr.goslow.link/your-path.
+Simple rule. Want an endpoint 5wx55yijr.goslow.link/*your-path* to respond with **your-response**? Post **your-response** to admin-5wx55yijr.goslow.link/*your-path*.
 
 Let's make the endpoint *5wx55yijr.goslow.link/another/* to respond to POST requests with **{"another": "response"}**
 and 3.4 seconds delay:
@@ -143,7 +143,7 @@ Response is: /*! jQuery v2.1.1 | (c) 2005, 2014 jQuery Foundation, Inc. | jquery
 ## Slow start
 If you think that storing your data on unprotected-by-passwords-third-party-domains is not a great idea, then you're absolutely right.
 
-The solution is to install goslow locally.
+You can install goslow on your own servers.
 
 ### Installation
 [Download](https://github.com/alexandershov/goslow/releases) a precompiled binary for your operating system.
@@ -152,7 +152,7 @@ If you're feeling adventurous, you can [build goslow from source.](https://githu
 
 ### Usage
 
-Start server:
+Start the server:
 ```shell
 ./goslow_darwin_amd64
 # or "goslow_windows_amd64.exe" if you're on Windows
@@ -167,7 +167,7 @@ because nobody wants to deal with the dynamically generated subdomain names on a
 
 You can configure goslow with POST requests to the endpoint /goslow.
 
-Simple rule for a local instance of goslow. Want an endpoint localhost:5103/your-path to respond with **your-response**? Post **your-response** to localhost:5103/goslow/your-path.
+Simple rule for a local instance of goslow. Want an endpoint localhost:5103/*your-path* to respond with **your-response**? Post **your-response** to localhost:5103/goslow/*your-path*.
 
 Let's add the endpoint */feed*:
 ```shell
@@ -184,11 +184,14 @@ If you want to use a persistent storage, then you need to specify *--db* and *--
 Goslow supports sqlite3:
 ```shell
 ./goslow --db sqlite3 --data-source /path/to/sqlite3/db/file
-# actually, sqlite3 is the default db, so this'll do:
-# ./goslow --data-source /path/to/sqlite3/db/file
 ```
 
-and postgres:
+Actually, sqlite3 is the default db, so this'll do:
+```shell
+./goslow --data-source /path/to/sqlite3/db/file
+```
+
+You can also use postgres:
 ```shell
 ./goslow --db postgres --data-source postgres://user@host/dbname
 # prefix 'postgres://' is required
