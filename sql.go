@@ -12,8 +12,13 @@ CREATE TABLE IF NOT EXISTS sites(
 );
 
 CREATE TABLE IF NOT EXISTS endpoints (
-  site TEXT, path TEXT, method TEXT, headers TEXT,
-  delay BIGINT, status_code INT, body BYTEA,
+  site        TEXT, 
+	path        TEXT,
+	method      TEXT,
+	headers     TEXT,
+  delay       BIGINT,
+	status_code INT,
+	body        BYTEA,
   PRIMARY KEY(site, path, method),
   FOREIGN KEY(site) REFERENCES sites(site)
 );

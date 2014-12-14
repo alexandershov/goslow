@@ -5,7 +5,8 @@ import (
 	"time"
 )
 
-// Endpoint describes path/HTTP/delay properties of the endpoint.
+// If Path/Method is an empty string, then endpoint handles
+// any path/HTTP method.
 type Endpoint struct {
 	Site       string
 	Path       string
@@ -13,19 +14,18 @@ type Endpoint struct {
 	Headers    map[string]string
 	Delay      time.Duration
 	StatusCode int
-	Body       []byte
+	Body       []byte // TODO: rename to Response?
 }
 
-// Endpoint.Matches returns true if endpoint matches a given request.
 func (endpoint *Endpoint) Matches(req *http.Request) bool {
 	return matches(endpoint.Path, req.URL.Path) && matches(endpoint.Method, req.Method)
 }
 
-// matches returns true if pattern matches the name. Empty pattern matches anything.
-// Pattern is just a string - all special characters (*?.) are not special and interpreted as is.
-func matches(pattern, name string) bool {
+// Empty pattern matches anything.
+// Pattern is just a string - special characters (*?.) are not special and interpreted as is.
+func matches(pattern, s string) bool {
 	if pattern == ANY {
 		return true
 	}
-	return pattern == name
+	return pattern == s
 }
