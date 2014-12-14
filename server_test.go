@@ -18,9 +18,9 @@ import (
 )
 
 const (
-	ANY_DB_DRIVER = ""
-	TEST_ENDPOINT = "localhost:9999"
-	TEST_DB       = "goslow_test"
+	ANY_DB_DRIVER    = ""
+	TEST_DEPLOYED_ON = "localhost:9999"
+	TEST_DB          = "goslow_test"
 )
 
 var DATA_SOURCE = map[string]string{
@@ -120,7 +120,7 @@ func run(t *testing.T, checkFunc CheckFunc, testCase *TestCase) {
 
 func checkZeroSite(t *testing.T, server *httptest.Server, testCase *TestCase) {
 	bytesShouldBeEqual(t,
-		readBody(GET(server.URL, "/", makeHost("0", TEST_ENDPOINT))),
+		readBody(GET(server.URL, "/", makeHost("0", TEST_DEPLOYED_ON))),
 		DEFAULT_BODY)
 }
 
@@ -166,10 +166,10 @@ func TestDelay(t *testing.T) {
 
 func checkDelay(t *testing.T, server *httptest.Server, testCase *TestCase) {
 	shouldRespondIn(t,
-		createGET(server.URL, "/", makeHost("0", TEST_ENDPOINT)),
+		createGET(server.URL, "/", makeHost("0", TEST_DEPLOYED_ON)),
 		0, 0.1) // seconds
 	shouldRespondIn(t,
-		createGET(server.URL, "/", makeHost("1", TEST_ENDPOINT)),
+		createGET(server.URL, "/", makeHost("1", TEST_DEPLOYED_ON)),
 		1, 1.1) // seconds
 }
 
@@ -179,7 +179,7 @@ func TestStatus(t *testing.T) {
 
 func checkStatus(t *testing.T, server *httptest.Server, testCase *TestCase) {
 	for _, statusCode := range []int{200, 404, 500} {
-		resp := GET(server.URL, "/", makeHost(strconv.Itoa(statusCode), TEST_ENDPOINT))
+		resp := GET(server.URL, "/", makeHost(strconv.Itoa(statusCode), TEST_DEPLOYED_ON))
 		shouldHaveStatusCode(t, statusCode, resp)
 	}
 }
@@ -191,7 +191,7 @@ func TestRuleCreation(t *testing.T) {
 func checkRuleCreationTestCase(t *testing.T, server *httptest.Server, testCase *TestCase) {
 	prefix := testCase.adminPathPrefix
 	isInSingleSiteMode := prefix != ""
-	domain, site := TEST_ENDPOINT, ""
+	domain, site := TEST_DEPLOYED_ON, ""
 	root_body := []byte("haha")
 	test_body := []byte("hop")
 	test_post_body := []byte("for POST")
@@ -229,7 +229,7 @@ func checkRuleCreationTestCase(t *testing.T, server *httptest.Server, testCase *
 
 func newSubDomainServer(testCase *TestCase) *Server {
 	config := DEFAULT_CONFIG // copies DEFAULT_CONFIG
-	config.endpoint = TEST_ENDPOINT
+	config.deployedOn = TEST_DEPLOYED_ON
 	config.createDefaultEndpoints = testCase.createDefaultEndpoints
 	config.adminPathPrefix = testCase.adminPathPrefix
 	config.driver = testCase.driver
@@ -310,7 +310,7 @@ func toDuration(seconds float64) time.Duration {
 
 func newDomain(server *httptest.Server, path string, response []byte) string {
 	resp := POST(server.URL, fmt.Sprintf("%s?output=short&method=GET", path),
-		makeHost("create", TEST_ENDPOINT), response)
+		makeHost("create", TEST_DEPLOYED_ON), response)
 	return string(readBody(resp))
 }
 
@@ -328,7 +328,7 @@ func getSite(domain string) string {
 }
 
 func addRule(server *httptest.Server, rule *Rule) *http.Response {
-	req := createPOST(server.URL, rule.Path, makeHost("admin-"+rule.Site, TEST_ENDPOINT),
+	req := createPOST(server.URL, rule.Path, makeHost("admin-"+rule.Site, TEST_DEPLOYED_ON),
 		rule.Body)
 	req.URL.RawQuery = getQueryString(rule)
 	return do(req)

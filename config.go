@@ -8,7 +8,7 @@ import (
 // Config stores command line arguments.
 type Config struct {
 	listenOn               string
-	endpoint               string // TODO: rename
+	deployedOn             string
 	driver                 string
 	dataSource             string
 	minSiteLength          int
@@ -19,7 +19,7 @@ type Config struct {
 
 var DEFAULT_CONFIG = Config{
 	listenOn:               ":5103",
-	endpoint:               "localhost:5103",
+	deployedOn:             "localhost:5103",
 	driver:                 "sqlite3",
 	dataSource:             "file::memory:?cache=shared", // we need cache=shared in the case of reconnect which happens sometines under load
 	minSiteLength:          6,
@@ -41,7 +41,7 @@ func (config *Config) defineFlags() {
 	flag.StringVar(&config.listenOn, "listen-on", DEFAULT_CONFIG.listenOn,
 		"address to listen on. E.g: 0.0.0.0:8000")
 
-	flag.StringVar(&config.endpoint, "endpoint", DEFAULT_CONFIG.endpoint,
+	flag.StringVar(&config.deployedOn, "deployed-on", DEFAULT_CONFIG.deployedOn,
 		`url at which this instance of goslow is visible to the world.
 	Used only in response texts, doesn't affect the listening address. E.g: goslow.link`)
 

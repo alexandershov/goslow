@@ -72,7 +72,7 @@ Make a POST request to http://{{ .CreateDomain }} to create new endpoints.
 Please contact codumentary.com@gmail.com for help.
 `))
 
-	// TODO: create.link should depend on config.endpoint
+	// TODO: create.link should depend on config.deployedOn
 	UNKNOWN_SITE_TEMPLATE = template.Must(template.New("unknown site").Parse(
 		`Oopsie daisy! Site {{ .Site }} doesn't exist.
 `))

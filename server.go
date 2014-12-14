@@ -329,14 +329,14 @@ func truncate(s string, maxLen int) string {
 
 func (server *Server) makeFullDomain(site string) string {
 	if server.isInSingleSiteMode() {
-		return server.config.endpoint
+		return server.config.deployedOn
 	}
-	return fmt.Sprintf("%s.%s", site, server.config.endpoint)
+	return fmt.Sprintf("%s.%s", site, server.config.deployedOn)
 }
 
 func (server *Server) makeAdminDomain(site string) string {
 	if server.isInSingleSiteMode() {
-		return server.config.endpoint
+		return server.config.deployedOn
 	}
 	return fmt.Sprintf("admin-%s", server.makeFullDomain(site))
 }
