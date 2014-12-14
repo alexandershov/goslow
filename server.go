@@ -23,6 +23,7 @@ var (
 )
 
 const (
+	// TODO: MIN_DELAY and MAX_DELAY should be time.Duration
 	MIN_DELAY       = 0   // seconds
 	MAX_DELAY       = 199 // seconds
 	MIN_STATUS_CODE = 200
@@ -244,15 +245,16 @@ func (server *Server) getRuleDelay(values url.Values) (time.Duration, error) {
 	if !contains {
 		return DEFAULT_DELAY, nil
 	}
-	delay := values.Get(DELAY_PARAM)
-	delayInSeconds, err := strconv.ParseFloat(delay, 64)
+	delayRaw := values.Get(DELAY_PARAM)
+	delayInSeconds, err := strconv.ParseFloat(delayRaw, 64)
 	if err != nil {
-		return time.Duration(0), InvalidDelayError(delay)
+		return time.Duration(0), InvalidDelayError(delayRaw)
 	}
+	delay := time.Duration(delayInSeconds*1000) * time.Millisecond
 	if delayInSeconds > MAX_DELAY {
-		return time.Duration(0), DelayIsTooBigError(delayInSeconds)
+		return time.Duration(0), DelayIsTooBigError(delay)
 	}
-	return time.Duration(delayInSeconds*1000) * time.Millisecond, nil
+	return delay, nil
 }
 
 func (server *Server) getRuleStatusCode(values url.Values) (int, error) {

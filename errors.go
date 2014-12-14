@@ -3,19 +3,22 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"time"
 )
 
-const CANT_CREATE_SITE_ERROR = `Can't create.
-Try again in a few seconds or contact codumentary.com@gmail.com for help`
+const CANT_CREATE_SITE_ERROR = `Oopsie daisy!
 
-// ApiError stores response error message and HTTP status code.
+Can't create a new site. It's not your fault.
+
+Please try again in a few seconds or contact codumentary.com@gmail.com for help
+`
+
 type ApiError struct {
 	Message    string
 	StatusCode int
 }
 
-// NewApiError returns an ApiError with the given status code and a message made from
-// the format string.
+// NewApiError returns an ApiError with the the message made from the format string.
 func NewApiError(statusCode int, format string, a ...interface{}) error {
 	return &ApiError{
 		Message:    fmt.Sprintf(format, a...),
@@ -23,24 +26,22 @@ func NewApiError(statusCode int, format string, a ...interface{}) error {
 	}
 }
 
-// ApiError.Error returns error message.
 func (error *ApiError) Error() string {
 	return error.Message
 }
 
-func InvalidDelayError(delay string) error {
+func InvalidDelayError(delayRaw string) error {
 	return NewApiError(http.StatusBadRequest,
-		"Oopsie daisy! Could not convert delay <%s> to float.", delay)
+		"Oopsie daisy! Could not convert delay <%s> to float.", delayRaw)
 }
 
-func DelayIsTooBigError(delayInSeconds float64) error {
+func DelayIsTooBigError(delay time.Duration) error {
 	return NewApiError(http.StatusBadRequest,
-		"Oopsie daisy! Delay can't be greater then %d seconds, got delay %.0f seconds.",
-		MAX_DELAY, delayInSeconds)
+		"Oopsie daisy! Delay can't be greater then %d seconds, got delay %s",
+		MAX_DELAY, delay)
+	// TODO: MAX_DELAY should be time.Duration
 }
 
-// ChangeBuiltinSiteError returns an ApiError when somebody tries to
-// change a built-in site.
 func ChangeBuiltinSiteError() error {
 	return NewApiError(http.StatusForbidden, "Oopsie daisy! You can't change builtin sites.")
 }
@@ -49,6 +50,7 @@ func UnknownSiteError(site string) error {
 	return NewApiError(http.StatusNotFound, "Oopsie daisy! Site <%s> doesn't exist.", site)
 }
 
+// TODO: rename to CantGenerateUniqueSiteNameError? (It is used in server.generateUniqueSiteName)
 func CantCreateSiteError() error {
 	return NewApiError(http.StatusInternalServerError, CANT_CREATE_SITE_ERROR)
 }
