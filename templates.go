@@ -6,15 +6,15 @@ import (
 )
 
 type TemplateData struct {
-	Site            string
-	Path            string
-	Method          string
-	Delay           time.Duration
-	TruncatedBody   string
-	CreateDomain    string
-	Domain          string
-	AdminDomain     string
-	adminPathPrefix string
+	Site              string
+	Path              string
+	Method            string
+	Delay             time.Duration
+	TruncatedResponse string
+	CreateDomain      string
+	Domain            string
+	AdminDomain       string
+	adminPathPrefix   string
 }
 
 // TODO: add helper to create templates easily
@@ -27,10 +27,10 @@ var (
 	ADD_ENDPOINT_EXAMPLE_TEMPLATE = template.Must(template.New("add endpoint example").Parse(
 		`Example:
 Let's say you want to add an endpoint {{ .Path }}
-and you want it to respond to GET requests with "{{ .TruncatedBody }}" and 2.5 seconds delay.
+and you want it to respond to GET requests with "{{ .TruncatedResponse }}" and 2.5 seconds delay.
 
 Just make a POST request to your admin domain ...
-curl -d "{{ .TruncatedBody }}" "{{ .AdminDomain }}{{ .adminPathPrefix }}{{ .Path }}?delay=2.5&method=GET"
+curl -d "{{ .TruncatedResponse }}" "{{ .AdminDomain }}{{ .adminPathPrefix }}{{ .Path }}?delay=2.5&method=GET"
 
 ... and you're done!
 `))
@@ -39,7 +39,7 @@ curl -d "{{ .TruncatedBody }}" "{{ .AdminDomain }}{{ .adminPathPrefix }}{{ .Path
 	CREATE_SITE_EXAMPLE_TEMPLATE = template.Must(template.New("create site example").Parse(
 		`Example:
 To create a new site make a POST request ...
-curl -d "{{ .TruncatedBody }}" "{{ .CreateDomain }}{{ .adminPathPrefix }}{{ .Path }}?delay=2.5&method=GET"
+curl -d "{{ .TruncatedResponse }}" "{{ .CreateDomain }}{{ .adminPathPrefix }}{{ .Path }}?delay=2.5&method=GET"
 ... and you're done!
 `))
 
@@ -51,7 +51,7 @@ You can configure it with POST requests to {{ .AdminDomain }}
 	ENDPOINT_ADDED_TEMPLATE = template.Must(template.New("endpoint added").Parse(
 		`Hooray!
 Endpoint http://{{ .Domain }}{{ .Path }} responds to {{if .Method }}{{ .Method }}{{else}}any HTTP method{{ end }} {{ if .Delay }}with {{ .Delay }} delay{{ else }}without any delay{{end}}.
-Response is: {{ if .TruncatedBody }}{{ .TruncatedBody }}{{ else }}<EMPTY>{{ end }}
+Response is: {{ if .TruncatedResponse }}{{ .TruncatedResponse }}{{ else }}<EMPTY>{{ end }}
 `))
 
 	UNKNOWN_ENDPOINT_TEMPLATE = template.Must(template.New("unknown endpoint").Parse(

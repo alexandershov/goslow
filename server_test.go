@@ -120,8 +120,8 @@ func run(t *testing.T, checkFunc CheckFunc, testCase *TestCase) {
 
 func checkZeroSite(t *testing.T, server *httptest.Server, testCase *TestCase) {
 	bytesShouldBeEqual(t,
-		readBody(GET(server.URL, "/", makeHost("0", TEST_DEPLOYED_ON))),
-		DEFAULT_BODY)
+		read(GET(server.URL, "/", makeHost("0", TEST_DEPLOYED_ON))),
+		DEFAULT_RESPONSE)
 }
 
 func TestTooLargeDelay(t *testing.T) {
@@ -144,7 +144,7 @@ func TestRedefineBuiltinSites(t *testing.T) {
 
 func checkRedefineBuiltinSites(t *testing.T, server *httptest.Server, testCase *TestCase) {
 	for _, site := range []string{"0", "99", "500", "create"} {
-		resp := addEndpoint(server, &Endpoint{Site: site, Path: "/test", Body: []byte("hop"), Method: "GET"})
+		resp := addEndpoint(server, &Endpoint{Site: site, Path: "/test", Response: []byte("hop"), Method: "GET"})
 		shouldHaveStatusCode(t, http.StatusForbidden, resp)
 	}
 }
@@ -192,38 +192,38 @@ func checkEndpointCreationTestCase(t *testing.T, server *httptest.Server, testCa
 	prefix := testCase.adminPathPrefix
 	isInSingleSiteMode := prefix != ""
 	domain, site := TEST_DEPLOYED_ON, ""
-	root_body := []byte("haha")
-	test_body := []byte("hop")
-	test_post_body := []byte("for POST")
+	root_response := []byte("haha")
+	test_response := []byte("hop")
+	test_post_response := []byte("for POST")
 	empty_payload := []byte("")
 
 	if isInSingleSiteMode {
-		resp := addEndpoint(server, &Endpoint{Path: join(prefix, "/"), Body: root_body})
+		resp := addEndpoint(server, &Endpoint{Path: join(prefix, "/"), Response: root_response})
 		shouldHaveStatusCode(t, http.StatusOK, resp)
 	} else {
-		domain = newDomain(server, join(prefix, "/"), root_body)
+		domain = newDomain(server, join(prefix, "/"), root_response)
 		site = getSite(domain)
 	}
 
-	bytesShouldBeEqual(t, readBody(GET(server.URL, "/", domain)), root_body)
+	bytesShouldBeEqual(t, read(GET(server.URL, "/", domain)), root_response)
 
 	// testing GET endpoint
-	resp := addEndpoint(server, &Endpoint{Site: site, Path: join(prefix, "/test"), Body: test_body, Method: "GET"})
+	resp := addEndpoint(server, &Endpoint{Site: site, Path: join(prefix, "/test"), Response: test_response, Method: "GET"})
 	shouldHaveStatusCode(t, http.StatusOK, resp)
 	// checking that GET /test endpoint works
-	bytesShouldBeEqual(t, readBody(GET(server.URL, "/test", domain)), test_body)
+	bytesShouldBeEqual(t, read(GET(server.URL, "/test", domain)), test_response)
 	// checking that GET /test doesn't affect POST
 	resp = POST(server.URL, "/test", domain, []byte(""))
 	intShouldBeEqual(t, 404, resp.StatusCode)
 
 	// testing POST endpoint
-	resp = addEndpoint(server, &Endpoint{Site: site, Path: join(prefix, "/test"), Body: test_post_body, Method: "POST",
+	resp = addEndpoint(server, &Endpoint{Site: site, Path: join(prefix, "/test"), Response: test_post_response, Method: "POST",
 		Delay: time.Duration(100) * time.Millisecond})
 	shouldHaveStatusCode(t, http.StatusOK, resp)
 	// checking that POST endpoint doesn't affect GET
-	bytesShouldBeEqual(t, readBody(GET(server.URL, "/test", domain)), test_body)
+	bytesShouldBeEqual(t, read(GET(server.URL, "/test", domain)), test_response)
 	// checking that POST /test endpoint works
-	bytesShouldBeEqual(t, readBody(POST(server.URL, "/test", domain, empty_payload)), test_post_body)
+	bytesShouldBeEqual(t, read(POST(server.URL, "/test", domain, empty_payload)), test_post_response)
 	shouldRespondIn(t, createPOST(server.URL, "/test", domain, empty_payload), 0.1, 0.15)
 }
 
@@ -263,7 +263,7 @@ func createRequest(method, url, path, host string, body io.Reader) *http.Request
 	return req
 }
 
-func readBody(resp *http.Response) []byte {
+func read(resp *http.Response) []byte {
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		log.Fatal(err)
@@ -290,7 +290,7 @@ func intShouldBeEqual(t *testing.T, expected, actual int) {
 func shouldRespondIn(t *testing.T, req *http.Request, minSeconds, maxSeconds float64) {
 	start := time.Now()
 	resp := do(req)
-	readBody(resp)
+	read(resp)
 	duration := time.Since(start)
 	minDuration := toDuration(minSeconds)
 	maxDuration := toDuration(maxSeconds)
@@ -311,7 +311,7 @@ func toDuration(seconds float64) time.Duration {
 func newDomain(server *httptest.Server, path string, response []byte) string {
 	resp := POST(server.URL, fmt.Sprintf("%s?output=short&method=GET", path),
 		makeHost("create", TEST_DEPLOYED_ON), response)
-	return string(readBody(resp))
+	return string(read(resp))
 }
 
 func POST(url, path, host string, payload []byte) *http.Response {
@@ -329,7 +329,7 @@ func getSite(domain string) string {
 
 func addEndpoint(server *httptest.Server, endpoint *Endpoint) *http.Response {
 	req := createPOST(server.URL, endpoint.Path, makeHost("admin-"+endpoint.Site, TEST_DEPLOYED_ON),
-		endpoint.Body)
+		endpoint.Response)
 	req.URL.RawQuery = getQueryString(endpoint)
 	return do(req)
 }

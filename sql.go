@@ -12,13 +12,13 @@ CREATE TABLE IF NOT EXISTS sites(
 );
 
 CREATE TABLE IF NOT EXISTS endpoints (
-  site        TEXT, 
+  site        TEXT,
 	path        TEXT,
 	method      TEXT,
 	headers     TEXT,
   delay       BIGINT,
 	status_code INT,
-	body        BYTEA,
+	response    BYTEA,
   PRIMARY KEY(site, path, method),
   FOREIGN KEY(site) REFERENCES sites(site)
 );
@@ -31,12 +31,12 @@ WHERE site = $1 AND path = $2 AND method = $3
 
 	INSERT_ENDPOINT_SQL = `
 INSERT INTO endpoints
-(site, path, method, headers, delay, status_code, body)
+(site, path, method, headers, delay, status_code, response)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
 `
 
 	GET_SITE_ENDPOINTS_SQL = `
-SELECT site, path, method, headers, delay, status_code, body
+SELECT site, path, method, headers, delay, status_code, response
 FROM endpoints
 WHERE site = $1
 ORDER BY LENGTH(path) DESC, LENGTH(method) DESC

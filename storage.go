@@ -89,7 +89,7 @@ func makeEndpoint(rows *sql.Rows) (*Endpoint, error) {
 	var headersJson string
 	var delay int64
 	err := rows.Scan(&endpoint.Site, &endpoint.Path, &endpoint.Method, &headersJson, &delay,
-		&endpoint.StatusCode, &endpoint.Body)
+		&endpoint.StatusCode, &endpoint.Response)
 	if err != nil {
 		return endpoint, err
 	}
@@ -142,7 +142,7 @@ func (storage *Storage) SaveEndpoint(endpoint *Endpoint) error {
 		return err
 	}
 	_, err = tx.Exec(storage.dialectify(INSERT_ENDPOINT_SQL), endpoint.Site, endpoint.Path, endpoint.Method,
-		headersJson, int64(endpoint.Delay), endpoint.StatusCode, endpoint.Body)
+		headersJson, int64(endpoint.Delay), endpoint.StatusCode, endpoint.Response)
 	if err != nil {
 		return err
 	}

@@ -1,6 +1,6 @@
 package main
 
-// TODO: look at different places where you can supply good error message
+// TODO: look at different places where you can supply good error messages
 
 import (
 	"fmt"
@@ -17,7 +17,7 @@ import (
 )
 
 var (
-	DEFAULT_BODY        = []byte(`{"goslow": "response"}`)
+	DEFAULT_RESPONSE    = []byte(`{"goslow": "response"}`)
 	DEFAULT_DELAY       = time.Duration(0)
 	DEFAULT_STATUS_CODE = http.StatusOK
 )
@@ -224,7 +224,7 @@ func (server *Server) makeEndpoint(site string, req *http.Request) (*Endpoint, e
 	if err != nil {
 		return nil, err
 	}
-	body, err := ioutil.ReadAll(req.Body)
+	response, err := ioutil.ReadAll(req.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -235,7 +235,7 @@ func (server *Server) makeEndpoint(site string, req *http.Request) (*Endpoint, e
 		Headers:    EMPTY_HEADERS,
 		Delay:      delay,
 		StatusCode: statusCode,
-		Body:       body,
+		Response:   response,
 	}
 	return endpoint, nil
 }
@@ -309,15 +309,15 @@ func (server *Server) showLongCreateSiteHelp(w http.ResponseWriter, endpoint *En
 
 func (server *Server) makeTemplateData(endpoint *Endpoint) *TemplateData {
 	return &TemplateData{
-		Site:            endpoint.Site,
-		Path:            endpoint.Path,
-		Method:          endpoint.Method,
-		Delay:           endpoint.Delay,
-		TruncatedBody:   truncate(string(endpoint.Body), 80),
-		CreateDomain:    server.makeFullDomain(CREATE_SUBDOMAIN_NAME),
-		Domain:          server.makeFullDomain(endpoint.Site),
-		AdminDomain:     server.makeAdminDomain(endpoint.Site),
-		adminPathPrefix: server.config.adminPathPrefix,
+		Site:              endpoint.Site,
+		Path:              endpoint.Path,
+		Method:            endpoint.Method,
+		Delay:             endpoint.Delay,
+		TruncatedResponse: truncate(string(endpoint.Response), 80),
+		CreateDomain:      server.makeFullDomain(CREATE_SUBDOMAIN_NAME),
+		Domain:            server.makeFullDomain(endpoint.Site),
+		AdminDomain:       server.makeAdminDomain(endpoint.Site),
+		adminPathPrefix:   server.config.adminPathPrefix,
 	}
 }
 
@@ -351,7 +351,7 @@ func (server *Server) makeAdminPath(site string) string {
 func (server *Server) makeExampleEndpoint(endpoint *Endpoint) *Endpoint {
 	example := *endpoint // make a copy
 	example.Path = "/christmas"
-	example.Body = []byte("hohoho")
+	example.Response = []byte("hohoho")
 	return &example
 }
 
@@ -458,7 +458,7 @@ func applyEndpoint(endpoint *Endpoint, w http.ResponseWriter) {
 	time.Sleep(endpoint.Delay)
 	addHeaders(endpoint.Headers, w.Header())
 	w.WriteHeader(endpoint.StatusCode)
-	w.Write(endpoint.Body)
+	w.Write(endpoint.Response)
 }
 
 func addHeaders(headers map[string]string, responseHeader http.Header) {
@@ -484,14 +484,14 @@ func (server *Server) handleUnknownEndpoint(w http.ResponseWriter, req *http.Req
 	switch {
 	case server.isInSingleSiteMode():
 		exampleTemplateData := *templateData
-		exampleTemplateData.TruncatedBody = "hohoho"
+		exampleTemplateData.TruncatedResponse = "hohoho"
 		// TODO: why do we need both templateData and exampleTemplateData?
 		UNKNOWN_ENDPOINT_TEMPLATE.Execute(w, templateData)
 		ADD_ENDPOINT_EXAMPLE_TEMPLATE.Execute(w, exampleTemplateData)
 
 	case isCreate(site):
 		exampleTemplateData := *templateData
-		exampleTemplateData.TruncatedBody = "hohoho"
+		exampleTemplateData.TruncatedResponse = "hohoho"
 		CREATE_SITE_HELP_TEMPLATE.Execute(w, templateData)
 		fmt.Fprintln(w) // TODO: why we need two calls to Fprintln?
 		fmt.Fprintln(w)
@@ -502,13 +502,13 @@ func (server *Server) handleUnknownEndpoint(w http.ResponseWriter, req *http.Req
 
 	case !containsSite:
 		exampleTemplateData := *templateData
-		exampleTemplateData.TruncatedBody = "hohoho"
+		exampleTemplateData.TruncatedResponse = "hohoho"
 		UNKNOWN_SITE_TEMPLATE.Execute(w, templateData)
 		CREATE_SITE_EXAMPLE_TEMPLATE.Execute(w, exampleTemplateData)
 
 	default: // when will this branch be chosen?
 		exampleTemplateData := *templateData
-		exampleTemplateData.TruncatedBody = "hohoho"
+		exampleTemplateData.TruncatedResponse = "hohoho"
 		// TODO: why do we need both templateData and exampleTemplateData?
 		UNKNOWN_ENDPOINT_TEMPLATE.Execute(w, templateData)
 		ADD_ENDPOINT_EXAMPLE_TEMPLATE.Execute(w, exampleTemplateData)
@@ -535,7 +535,7 @@ func (server *Server) createSitesInRange(minSite, maxSite int) {
 			Headers:    server.headersFor(i),
 			Delay:      server.delayFor(i),
 			StatusCode: server.statusFor(i),
-			Body:       DEFAULT_BODY,
+			Response:   DEFAULT_RESPONSE,
 		}
 		err = server.storage.SaveEndpoint(endpoint)
 		if err != nil {

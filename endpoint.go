@@ -14,7 +14,7 @@ type Endpoint struct {
 	Headers    map[string]string
 	Delay      time.Duration
 	StatusCode int
-	Body       []byte // TODO: rename to Response?
+	Response   []byte
 }
 
 func (endpoint *Endpoint) Matches(req *http.Request) bool {
