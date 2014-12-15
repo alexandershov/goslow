@@ -24,7 +24,7 @@ func (endpoint *Endpoint) Matches(req *http.Request) bool {
 // Empty pattern matches anything.
 // Pattern is just a string - special characters (*?.) are not special and interpreted as is.
 func matches(pattern, s string) bool {
-	if pattern == ANY {
+	if pattern == ANY_STRING {
 		return true
 	}
 	return pattern == s

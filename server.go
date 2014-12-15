@@ -34,7 +34,7 @@ const (
 )
 
 const (
-	ANY = ""
+	ANY_STRING = ""
 )
 
 const (
@@ -534,8 +534,8 @@ func (server *Server) createSitesInRange(minSite, maxSite int) {
 		}
 		endpoint := &Endpoint{
 			Site:       site,
-			Path:       ANY,
-			Method:     ANY,
+			Path:       ANY_STRING,
+			Method:     ANY_STRING,
 			Headers:    server.headersFor(i),
 			Delay:      server.delayFor(i),
 			StatusCode: server.statusFor(i),
