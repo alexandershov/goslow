@@ -23,14 +23,18 @@ var (
 )
 
 const (
-	// TODO: MIN_DELAY and MAX_DELAY should be time.Duration
-	MIN_DELAY       = 0   // seconds
-	MAX_DELAY       = 199 // seconds
+	MIN_DELAY = time.Duration(0) * time.Second
+	MAX_DELAY = time.Duration(199) * time.Second
+
 	MIN_STATUS_CODE = 200
 	MAX_STATUS_CODE = 599
+
 	ZERO_DELAY_SITE = "0"
 	EMPTY_SITE      = ""
-	ANY             = ""
+)
+
+const (
+	ANY = ""
 )
 
 const (
@@ -251,7 +255,7 @@ func (server *Server) getEndpointDelay(values url.Values) (time.Duration, error)
 		return time.Duration(0), InvalidDelayError(delayRaw)
 	}
 	delay := time.Duration(delayInSeconds*1000) * time.Millisecond
-	if delayInSeconds > MAX_DELAY {
+	if delay > MAX_DELAY {
 		return time.Duration(0), DelayIsTooBigError(delay)
 	}
 	return delay, nil
@@ -517,7 +521,7 @@ func (server *Server) handleUnknownEndpoint(w http.ResponseWriter, req *http.Req
 }
 
 func (server *Server) createDefaultEndpoints() {
-	server.createSitesInRange(MIN_DELAY, MAX_DELAY)
+	server.createSitesInRange(int(MIN_DELAY/time.Second), int(MAX_DELAY/time.Second))
 	server.createSitesInRange(MIN_STATUS_CODE, MAX_STATUS_CODE)
 }
 
@@ -554,7 +558,7 @@ func (server *Server) headersFor(site int) map[string]string {
 }
 
 func (server *Server) delayFor(site int) time.Duration {
-	if site <= MAX_DELAY {
+	if time.Duration(site)*time.Second <= MAX_DELAY {
 		return time.Duration(site) * time.Second
 	}
 	return time.Duration(0)

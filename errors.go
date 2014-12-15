@@ -37,9 +37,8 @@ func InvalidDelayError(delayRaw string) error {
 
 func DelayIsTooBigError(delay time.Duration) error {
 	return NewApiError(http.StatusBadRequest,
-		"Oopsie daisy! Delay can't be greater then %d seconds, got delay %s",
+		"Oopsie daisy! Delay can't be greater than %s, got delay %s",
 		MAX_DELAY, delay)
-	// TODO: MAX_DELAY should be time.Duration
 }
 
 func ChangeBuiltinSiteError() error {
