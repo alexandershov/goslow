@@ -34,22 +34,21 @@ const (
 )
 
 const (
-	ANY_STRING = ""
+	MATCHES_ANY_STRING = ""
 )
 
 const (
-	CREATE_SUBDOMAIN_NAME         = "create"
-	ADD_ENDPOINT_SUBDOMAIN_PREFIX = "admin-"
+	CREATE_SUBDOMAIN       = "create"
+	ADMIN_SUBDOMAIN_PREFIX = "admin-"
 )
 
 var (
-	REDIRECT_STATUSES = map[int]bool{301: true, 302: true}
-	EMPTY_HEADERS     = map[string]string{}
+	EMPTY_HEADERS = map[string]string{}
 )
 
 const (
 	MAX_GENERATE_SITE_NAME_ATTEMPTS = 5
-	GOSLOW_LAUNCH_TIMESTAMP         = 1417447141
+	GOSLOW_LAUNCH_TIMESTAMP         = 1417447141 // December 1, 2014 18:19:01
 )
 
 const (
@@ -58,16 +57,12 @@ const (
 	METHOD_PARAM      = "method"
 )
 
-// Server listens on the address specified by the config,
-// stores endpoints in the storage, and generates new site names
-// with the hasher.
 type Server struct {
 	config  *Config
 	storage *Storage
-	hasher  *hashids.HashID
+	hasher  *hashids.HashID // used to generate new site names
 }
 
-// NewServer returns a new server from the specified config.
 func NewServer(config *Config) *Server {
 	storage, err := NewStorage(config.driver, config.dataSource)
 	if err != nil {
@@ -150,7 +145,7 @@ func (server *Server) isCreateSite(req *http.Request) bool {
 	if server.isInSingleSiteMode() {
 		return false
 	}
-	return getSubdomain(req.Host) == CREATE_SUBDOMAIN_NAME
+	return getSubdomain(req.Host) == CREATE_SUBDOMAIN
 }
 
 func (server *Server) isInSingleSiteMode() bool {
@@ -318,7 +313,7 @@ func (server *Server) makeTemplateData(endpoint *Endpoint) *TemplateData {
 		Method:            endpoint.Method,
 		Delay:             endpoint.Delay,
 		TruncatedResponse: truncate(string(endpoint.Response), 80),
-		CreateDomain:      server.makeFullDomain(CREATE_SUBDOMAIN_NAME),
+		CreateDomain:      server.makeFullDomain(CREATE_SUBDOMAIN),
 		Domain:            server.makeFullDomain(endpoint.Site),
 		AdminDomain:       server.makeAdminDomain(endpoint.Site),
 		adminPathPrefix:   server.config.adminPathPrefix,
@@ -379,7 +374,7 @@ func (server *Server) isAddEndpoint(req *http.Request) bool {
 	if server.isInSingleSiteMode() {
 		return server.isAddEndpointPath(req.URL.Path)
 	}
-	return strings.HasPrefix(getSubdomain(req.Host), ADD_ENDPOINT_SUBDOMAIN_PREFIX)
+	return strings.HasPrefix(getSubdomain(req.Host), ADMIN_SUBDOMAIN_PREFIX)
 }
 
 func (server *Server) isAddEndpointPath(path string) bool {
@@ -422,7 +417,7 @@ func (server *Server) getSite(req *http.Request) string {
 	}
 	subdomain := getSubdomain(req.Host)
 	if server.isAddEndpoint(req) {
-		return strings.TrimPrefix(subdomain, ADD_ENDPOINT_SUBDOMAIN_PREFIX)
+		return strings.TrimPrefix(subdomain, ADMIN_SUBDOMAIN_PREFIX)
 	}
 	return subdomain
 }
@@ -432,7 +427,7 @@ func isBuiltin(site string) bool {
 }
 
 func isCreate(site string) bool {
-	return site == CREATE_SUBDOMAIN_NAME
+	return site == CREATE_SUBDOMAIN
 }
 
 func isDefault(site string) bool {
@@ -534,8 +529,8 @@ func (server *Server) createSitesInRange(minSite, maxSite int) {
 		}
 		endpoint := &Endpoint{
 			Site:       site,
-			Path:       ANY_STRING,
-			Method:     ANY_STRING,
+			Path:       MATCHES_ANY_STRING,
+			Method:     MATCHES_ANY_STRING,
 			Headers:    server.headersFor(i),
 			Delay:      server.delayFor(i),
 			StatusCode: server.statusFor(i),
@@ -549,12 +544,15 @@ func (server *Server) createSitesInRange(minSite, maxSite int) {
 }
 
 func (server *Server) headersFor(site int) map[string]string {
-	_, isRedirect := REDIRECT_STATUSES[site]
-	if isRedirect {
+	if isRedirect(site) {
 		host := fmt.Sprintf("//%s", server.makeFullDomain(ZERO_DELAY_SITE))
 		return map[string]string{"Location": host}
 	}
 	return EMPTY_HEADERS
+}
+
+func isRedirect(statusCode int) bool {
+	return statusCode == http.StatusMovedPermanently || statusCode == http.StatusFound
 }
 
 func (server *Server) delayFor(site int) time.Duration {
