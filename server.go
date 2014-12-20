@@ -74,6 +74,7 @@ func NewServer(config *Config) *Server {
 		storage: storage,
 		hasher:  newHasher(config.siteSalt, config.minSiteLength),
 	}
+
 	if config.createDefaultEndpoints {
 		server.createDefaultEndpoints()
 	}
@@ -84,11 +85,11 @@ func NewServer(config *Config) *Server {
 }
 
 func newHasher(salt string, minLength int) *hashids.HashID {
-	hd := hashids.NewData()
-	hd.Salt = salt
-	hd.MinLength = minLength
-	hd.Alphabet = "abcdefghijklmnopqrstuvwxyz1234567890"
-	return hashids.NewWithData(hd)
+	d := hashids.NewData()
+	d.Salt = salt
+	d.MinLength = minLength
+	d.Alphabet = "abcdefghijklmnopqrstuvwxyz1234567890"
+	return hashids.NewWithData(d)
 }
 
 // Server.ServeHTTP implements Handler interface.
@@ -96,6 +97,7 @@ func newHasher(salt string, minLength int) *hashids.HashID {
 func (server *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	start := time.Now()
 	var err error = nil
+
 	switch {
 	case server.isOptions(req):
 		allowCrossDomainRequests(w, req)
@@ -110,20 +112,12 @@ func (server *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		allowCrossDomainRequests(w, req)
 		err = server.respondFromEndpoint(w, req)
 	}
+
 	if err != nil {
 		server.handleError(err, w)
 	}
-	duration := time.Since(start)
-	log.Printf("%s\t%s\t%s\t%s\t%s", getRealIP(req), req.Method, req.Host, req.URL.Path, duration)
-}
 
-func getRealIP(req *http.Request) string {
-	xRealIP := req.Header.Get("X-Real-IP")
-	if xRealIP != "" {
-		return xRealIP
-	}
-	host, _, _ := net.SplitHostPort(req.RemoteAddr)
-	return host
+	logRequest(req, start)
 }
 
 func (server *Server) isOptions(req *http.Request) bool {
@@ -282,6 +276,21 @@ func (server *Server) handleError(err error, w http.ResponseWriter) {
 		message := fmt.Sprintf("Internal error: %s.", err)
 		http.Error(w, message, http.StatusInternalServerError)
 	}
+}
+
+func logRequest(req *http.Request, start time.Time) {
+	duration := time.Since(start)
+	logRecord := []string{getRealIP(req), req.Method, req.Host, req.URL.Path, duration.String()}
+	log.Printf(strings.Join(logRecord, "\t"))
+}
+
+func getRealIP(req *http.Request) string {
+	xRealIP := req.Header.Get("X-Real-IP")
+	if xRealIP != "" {
+		return xRealIP
+	}
+	host, _, _ := net.SplitHostPort(req.RemoteAddr)
+	return host
 }
 
 func wantsShortResponse(req *http.Request) bool {
