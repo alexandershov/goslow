@@ -103,10 +103,10 @@ func (server *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		allowCrossDomainRequests(w, req)
 
 	case server.isCreateSite(req):
-		err = server.handleCreateSite(w, req)
+		err = server.createSite(w, req)
 
-	case server.isAddEndpoint(req):
-		err = server.handleAddEndpoint(w, req)
+	case server.isCreateEndpoint(req):
+		err = server.handleCreateEndpoint(w, req)
 
 	default:
 		allowCrossDomainRequests(w, req)
@@ -150,12 +150,12 @@ func getSubdomain(url string) string {
 	return strings.Split(url, ".")[0]
 }
 
-func (server *Server) handleCreateSite(w http.ResponseWriter, req *http.Request) error {
+func (server *Server) createSite(w http.ResponseWriter, req *http.Request) error {
 	site, err := server.generateUniqueSiteName(MAX_GENERATE_SITE_NAME_ATTEMPTS)
 	if err != nil {
 		return err
 	}
-	endpoint, err := server.addEndpoint(site, req)
+	endpoint, err := server.createEndpoint(site, req)
 	if err != nil {
 		return err
 	}
@@ -193,7 +193,7 @@ func generateUniqueNumbers() []int {
 	return []int{seconds, milliseconds}
 }
 
-func (server *Server) addEndpoint(site string, req *http.Request) (*Endpoint, error) {
+func (server *Server) createEndpoint(site string, req *http.Request) (*Endpoint, error) {
 	endpoint, err := server.makeEndpoint(site, req)
 	if err != nil {
 		return nil, err
@@ -376,17 +376,17 @@ func (server *Server) respondFromEndpoint(w http.ResponseWriter, req *http.Reque
 	return nil
 }
 
-func (server *Server) isAddEndpoint(req *http.Request) bool {
+func (server *Server) isCreateEndpoint(req *http.Request) bool {
 	if req.Method != "POST" {
 		return false
 	}
 	if server.isInSingleSiteMode() {
-		return server.isAddEndpointPath(req.URL.Path)
+		return server.isCreateEndpointPath(req.URL.Path)
 	}
 	return strings.HasPrefix(getSubdomain(req.Host), ADMIN_SUBDOMAIN_PREFIX)
 }
 
-func (server *Server) isAddEndpointPath(path string) bool {
+func (server *Server) isCreateEndpointPath(path string) bool {
 	adminPath := server.config.adminPathPrefix
 	if !strings.HasPrefix(path, adminPath) {
 		return false
@@ -398,7 +398,8 @@ func (server *Server) isAddEndpointPath(path string) bool {
 	return suffix == "" || suffix[0] == '?' || suffix[0] == '/'
 }
 
-func (server *Server) handleAddEndpoint(w http.ResponseWriter, req *http.Request) error {
+// TODO: rename
+func (server *Server) handleCreateEndpoint(w http.ResponseWriter, req *http.Request) error {
 	site := server.getSite(req)
 	if isBuiltin(site) {
 		return ChangeBuiltinSiteError()
@@ -411,7 +412,7 @@ func (server *Server) handleAddEndpoint(w http.ResponseWriter, req *http.Request
 		// TODO: show a long help text here (like in handleUnknownEndpoint)
 		return UnknownSiteError(site)
 	}
-	endpoint, err := server.addEndpoint(site, req)
+	endpoint, err := server.createEndpoint(site, req)
 	if err != nil {
 		return err
 	}
@@ -425,7 +426,7 @@ func (server *Server) getSite(req *http.Request) string {
 		return EMPTY_SITE
 	}
 	subdomain := getSubdomain(req.Host)
-	if server.isAddEndpoint(req) {
+	if server.isCreateEndpoint(req) {
 		return strings.TrimPrefix(subdomain, ADMIN_SUBDOMAIN_PREFIX)
 	}
 	return subdomain

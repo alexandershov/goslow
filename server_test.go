@@ -132,7 +132,7 @@ func checkTooLargeDelay(t *testing.T, server *httptest.Server, testCase *TestCas
 	prefix := testCase.adminPathPrefix
 	domain := newDomain(server, join(prefix, "/booya"), []byte("haha"))
 	site := getSite(domain)
-	resp := addEndpoint(server, &Endpoint{Site: site, Delay: time.Duration(1000) * time.Second})
+	resp := createEndpoint(server, &Endpoint{Site: site, Delay: time.Duration(1000) * time.Second})
 	shouldHaveStatusCode(t, http.StatusBadRequest, resp)
 	resp = GET(server.URL, "/", domain)
 	shouldHaveStatusCode(t, http.StatusNotFound, resp)
@@ -144,7 +144,7 @@ func TestRedefineBuiltinSites(t *testing.T) {
 
 func checkRedefineBuiltinSites(t *testing.T, server *httptest.Server, testCase *TestCase) {
 	for _, site := range []string{"0", "99", "500", "create"} {
-		resp := addEndpoint(server, &Endpoint{Site: site, Path: "/test", Response: []byte("hop"), Method: "GET"})
+		resp := createEndpoint(server, &Endpoint{Site: site, Path: "/test", Response: []byte("hop"), Method: "GET"})
 		shouldHaveStatusCode(t, http.StatusForbidden, resp)
 	}
 }
@@ -155,7 +155,7 @@ func TestRedefineNonExistentSite(t *testing.T) {
 
 func checkRedefineNonExistentSite(t *testing.T, server *httptest.Server, testCase *TestCase) {
 	for _, site := range []string{"", "ha", "admin-500"} {
-		resp := addEndpoint(server, &Endpoint{Site: site})
+		resp := createEndpoint(server, &Endpoint{Site: site})
 		shouldHaveStatusCode(t, http.StatusNotFound, resp)
 	}
 }
@@ -198,7 +198,7 @@ func checkEndpointCreationTestCase(t *testing.T, server *httptest.Server, testCa
 	empty_payload := []byte("")
 
 	if isInSingleSiteMode {
-		resp := addEndpoint(server, &Endpoint{Path: join(prefix, "/"), Response: root_response})
+		resp := createEndpoint(server, &Endpoint{Path: join(prefix, "/"), Response: root_response})
 		shouldHaveStatusCode(t, http.StatusOK, resp)
 	} else {
 		domain = newDomain(server, join(prefix, "/"), root_response)
@@ -208,7 +208,7 @@ func checkEndpointCreationTestCase(t *testing.T, server *httptest.Server, testCa
 	bytesShouldBeEqual(t, read(GET(server.URL, "/", domain)), root_response)
 
 	// testing GET endpoint
-	resp := addEndpoint(server, &Endpoint{Site: site, Path: join(prefix, "/test"), Response: test_response, Method: "GET"})
+	resp := createEndpoint(server, &Endpoint{Site: site, Path: join(prefix, "/test"), Response: test_response, Method: "GET"})
 	shouldHaveStatusCode(t, http.StatusOK, resp)
 	// checking that GET /test endpoint works
 	bytesShouldBeEqual(t, read(GET(server.URL, "/test", domain)), test_response)
@@ -217,7 +217,7 @@ func checkEndpointCreationTestCase(t *testing.T, server *httptest.Server, testCa
 	intShouldBeEqual(t, 404, resp.StatusCode)
 
 	// testing POST endpoint
-	resp = addEndpoint(server, &Endpoint{Site: site, Path: join(prefix, "/test"), Response: test_post_response, Method: "POST",
+	resp = createEndpoint(server, &Endpoint{Site: site, Path: join(prefix, "/test"), Response: test_post_response, Method: "POST",
 		Delay: time.Duration(100) * time.Millisecond})
 	shouldHaveStatusCode(t, http.StatusOK, resp)
 	// checking that POST endpoint doesn't affect GET
@@ -327,7 +327,7 @@ func getSite(domain string) string {
 	return strings.Split(domain, ".")[0]
 }
 
-func addEndpoint(server *httptest.Server, endpoint *Endpoint) *http.Response {
+func createEndpoint(server *httptest.Server, endpoint *Endpoint) *http.Response {
 	req := createPOST(server.URL, endpoint.Path, makeHost("admin-"+endpoint.Site, TEST_DEPLOYED_ON),
 		endpoint.Response)
 	req.URL.RawQuery = getQueryString(endpoint)
