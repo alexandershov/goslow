@@ -281,7 +281,7 @@ func (server *Server) handleError(err error, w http.ResponseWriter) {
 func logRequest(req *http.Request, start time.Time) {
 	duration := time.Since(start)
 	logRecord := []string{getRealIP(req), req.Method, req.Host, req.URL.Path, duration.String()}
-	log.Printf(strings.Join(logRecord, "\t"))
+	log.Println(strings.Join(logRecord, "\t"))
 }
 
 func getRealIP(req *http.Request) string {
