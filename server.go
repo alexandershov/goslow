@@ -146,8 +146,8 @@ func (server *Server) isInSingleSiteMode() bool {
 	return server.config.isInSingleSiteMode()
 }
 
-func getSubdomain(url string) string {
-	return strings.Split(url, ".")[0]
+func getSubdomain(host string) string {
+	return strings.Split(host, ".")[0]
 }
 
 func (server *Server) createSite(w http.ResponseWriter, req *http.Request) error {
@@ -159,6 +159,7 @@ func (server *Server) createSite(w http.ResponseWriter, req *http.Request) error
 	if err != nil {
 		return err
 	}
+
 	if wantsShortResponse(req) {
 		server.showShortCreateSiteHelp(w, endpoint)
 	} else {
@@ -167,12 +168,14 @@ func (server *Server) createSite(w http.ResponseWriter, req *http.Request) error
 	return nil
 }
 
-func (server *Server) generateUniqueSiteName(numAttempts uint) (string, error) {
-	for ; numAttempts > 0; numAttempts-- {
+func (server *Server) generateUniqueSiteName(maxAttempts int) (string, error) {
+	for i := 0; i < maxAttempts; i++ {
 		site, err := server.makeSiteNameFrom(generateUniqueNumbers())
 		if err != nil {
+			log.Print(err)
 			break
 		}
+
 		err = server.storage.CreateSite(site)
 		if err == nil {
 			return site, nil
@@ -188,9 +191,9 @@ func (server *Server) makeSiteNameFrom(numbers []int) (string, error) {
 
 func generateUniqueNumbers() []int {
 	utc := time.Now().UTC()
-	seconds := int(utc.Unix()) - GOSLOW_LAUNCH_TIMESTAMP // revisit this line in the year 2037
+	secondsSinceLaunch := int(utc.Unix()) - GOSLOW_LAUNCH_TIMESTAMP // revisit this line in the year 2037
 	milliseconds := (utc.Nanosecond() / 1000000)
-	return []int{seconds, milliseconds}
+	return []int{secondsSinceLaunch, milliseconds}
 }
 
 func (server *Server) createEndpoint(site string, req *http.Request) (*Endpoint, error) {
@@ -207,8 +210,7 @@ func (server *Server) makeEndpoint(site string, req *http.Request) (*Endpoint, e
 	if err != nil {
 		return nil, err
 	}
-	path := server.getEndpointPath(req)
-	method := server.getEndpointMethod(values)
+
 	delay, err := server.getEndpointDelay(values)
 	if err != nil {
 		return nil, err
@@ -223,8 +225,8 @@ func (server *Server) makeEndpoint(site string, req *http.Request) (*Endpoint, e
 	}
 	endpoint := &Endpoint{
 		Site:       site,
-		Path:       path,
-		Method:     method,
+		Path:       server.getEndpointPath(req),
+		Method:     server.getEndpointMethod(values),
 		Headers:    EMPTY_HEADERS,
 		Delay:      delay,
 		StatusCode: statusCode,
@@ -234,31 +236,43 @@ func (server *Server) makeEndpoint(site string, req *http.Request) (*Endpoint, e
 }
 
 func (server *Server) getEndpointDelay(values url.Values) (time.Duration, error) {
-	_, contains := values[DELAY_PARAM]
-	if !contains {
+	_, hasDelay := values[DELAY_PARAM]
+	if !hasDelay {
 		return DEFAULT_DELAY, nil
 	}
-	delayRaw := values.Get(DELAY_PARAM)
-	delayInSeconds, err := strconv.ParseFloat(delayRaw, 64)
+
+	rawDelay := values.Get(DELAY_PARAM)
+	delayInSeconds, err := strconv.ParseFloat(rawDelay, 64)
 	if err != nil {
-		return time.Duration(0), InvalidDelayError(delayRaw)
+		return time.Duration(0), InvalidDelayError(rawDelay)
 	}
-	delay := time.Duration(delayInSeconds*1000) * time.Millisecond
+
+	delay := secondsToDuration(delayInSeconds)
 	if delay > MAX_DELAY {
 		return time.Duration(0), DelayIsTooBigError(delay)
 	}
 	return delay, nil
 }
 
+// Convert with millisecond precision
+func secondsToDuration(seconds float64) time.Duration {
+	milliseconds := seconds * 1000
+	return time.Duration(milliseconds) * time.Millisecond
+}
+
 func (server *Server) getEndpointStatusCode(values url.Values) (int, error) {
-	_, contains := values[STATUS_CODE_PARAM]
-	if !contains {
+	_, hasStatusCode := values[STATUS_CODE_PARAM]
+	if !hasStatusCode {
 		return DEFAULT_STATUS_CODE, nil
 	}
 	return strconv.Atoi(values.Get(STATUS_CODE_PARAM))
 }
 
 func (server *Server) getEndpointMethod(values url.Values) string {
+	_, hasMethod := values[METHOD_PARAM]
+	if !hasMethod {
+		return MATCHES_ANY_STRING
+	}
 	return values.Get(METHOD_PARAM)
 }
 
@@ -295,7 +309,8 @@ func getRealIP(req *http.Request) string {
 
 func wantsShortResponse(req *http.Request) bool {
 	values, err := url.ParseQuery(req.URL.RawQuery)
-	if err != nil {
+	if err != nil { // impossible path, error from url.ParseQuery is handled in makeEndpoint
+		log.Print(err)
 		return false
 	}
 	return values.Get("output") == "short"

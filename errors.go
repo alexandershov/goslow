@@ -30,9 +30,9 @@ func (error *ApiError) Error() string {
 	return error.Message
 }
 
-func InvalidDelayError(delayRaw string) error {
+func InvalidDelayError(rawDelay string) error {
 	return NewApiError(http.StatusBadRequest,
-		"Oopsie daisy! Could not convert delay <%s> to float.", delayRaw)
+		"Oopsie daisy! Could not convert delay <%s> to float.", rawDelay)
 }
 
 func DelayIsTooBigError(delay time.Duration) error {
