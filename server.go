@@ -321,8 +321,8 @@ func (server *Server) showShortCreateSiteHelp(w http.ResponseWriter, endpoint *E
 }
 
 func (server *Server) showLongCreateSiteHelp(w http.ResponseWriter, endpoint *Endpoint) {
-	templateData := server.makeTemplateData(endpoint)
 	BANNER_TEMPLATE.Execute(w, nil)
+	templateData := server.makeTemplateData(endpoint)
 	ENDPOINT_ADDED_TEMPLATE.Execute(w, templateData)
 	fmt.Fprintln(w)
 	SITE_CREATED_TEMPLATE.Execute(w, templateData)
@@ -340,7 +340,7 @@ func (server *Server) makeTemplateData(endpoint *Endpoint) *TemplateData {
 		CreateDomain:      server.makeFullDomain(CREATE_SUBDOMAIN),
 		Domain:            server.makeFullDomain(endpoint.Site),
 		AdminDomain:       server.makeAdminDomain(endpoint.Site),
-		adminPathPrefix:   server.config.adminPathPrefix,
+		AdminPathPrefix:   server.config.adminPathPrefix,
 	}
 }
 
