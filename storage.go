@@ -33,8 +33,8 @@ func NewStorage(driver string, dataSource string) (*Storage, error) {
 	return storage, err
 }
 
-// Storage.FindEndpointMatching returns a endpoint matching a given site and HTTP request.
-func (storage *Storage) FindEndpointMatching(site string, req *http.Request) (endpoint *Endpoint, found bool, err error) {
+// Storage.FindEndpoint returns a endpoint matching a given site and HTTP request.
+func (storage *Storage) FindEndpoint(site string, req *http.Request) (endpoint *Endpoint, found bool, err error) {
 	endpoints, err := storage.getEndpoints(site)
 	if err != nil {
 		return nil, false, err
@@ -161,13 +161,13 @@ func (storage *Storage) CreateSite(site string) error {
 	return err
 }
 
-// Storage.ContainsSite returns true if the given site exists in a database.
-func (storage *Storage) ContainsSite(site string) (bool, error) {
+// Storage.SiteExists returns true if the given site exists in a database.
+func (storage *Storage) SiteExists(site string) (bool, error) {
 	rows, err := storage.db.Query(storage.dialectify(GET_SITE_SQL), site)
 	if err != nil {
 		return false, err
 	}
 	defer rows.Close()
-	containsSite := rows.Next()
-	return containsSite, rows.Err()
+	siteExists := rows.Next()
+	return siteExists, rows.Err()
 }

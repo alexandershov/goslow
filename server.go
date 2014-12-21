@@ -105,7 +105,7 @@ func (server *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	case server.isCreateSite(req):
 		err = server.createSite(w, req)
 
-	case server.isCreateEndpoint(req):
+	case server.isAdmin(req):
 		err = server.handleCreateEndpoint(w, req)
 
 	default:
@@ -276,6 +276,14 @@ func (server *Server) getEndpointMethod(values url.Values) string {
 	return values.Get(METHOD_PARAM)
 }
 
+func (server *Server) getEndpointPath(req *http.Request) string {
+	if server.isInSingleSiteMode() {
+		path := strings.TrimPrefix(req.URL.Path, server.config.adminPathPrefix)
+		return ensureHasPrefix(path, "/")
+	}
+	return req.URL.Path
+}
+
 func getRandomDurationBetween(minMilliseconds, maxMilliseconds int) time.Duration {
 	milliseconds := minMilliseconds + rand.Intn(maxMilliseconds-minMilliseconds+1)
 	return time.Duration(milliseconds) * time.Millisecond
@@ -363,12 +371,8 @@ func (server *Server) makeAdminDomain(site string) string {
 	if server.isInSingleSiteMode() {
 		return server.config.deployedOn
 	}
-	return fmt.Sprintf("admin-%s", server.makeFullDomain(site))
-}
-
-func (server *Server) makeAdminPath(site string) string {
-	adminDomain := server.makeAdminDomain(site)
-	return adminDomain + server.config.adminPathPrefix
+	adminSubdomain := fmt.Sprintf("admin-%s", site)
+	return server.makeFullDomain(adminSubdomain)
 }
 
 func (server *Server) makeExampleEndpoint(endpoint *Endpoint) *Endpoint {
@@ -379,51 +383,52 @@ func (server *Server) makeExampleEndpoint(endpoint *Endpoint) *Endpoint {
 }
 
 func (server *Server) respondFromEndpoint(w http.ResponseWriter, req *http.Request) error {
-	endpoint, found, err := server.storage.FindEndpointMatching(server.getSite(req), req)
+	endpoint, found, err := server.storage.FindEndpoint(server.getSite(req), req)
 	if err != nil {
 		return err
 	}
 	if found {
-		applyEndpoint(endpoint, w)
+		respondWith(endpoint, w)
 	} else {
 		return server.handleUnknownEndpoint(w, req)
 	}
 	return nil
 }
 
-func (server *Server) isCreateEndpoint(req *http.Request) bool {
+func (server *Server) isAdmin(req *http.Request) bool {
 	if req.Method != "POST" {
 		return false
 	}
 	if server.isInSingleSiteMode() {
-		return server.isCreateEndpointPath(req.URL.Path)
+		return server.isAdminPath(req.URL.Path)
 	}
 	return strings.HasPrefix(getSubdomain(req.Host), ADMIN_SUBDOMAIN_PREFIX)
 }
 
-func (server *Server) isCreateEndpointPath(path string) bool {
-	adminPath := server.config.adminPathPrefix
-	if !strings.HasPrefix(path, adminPath) {
+// TODO: refactor
+func (server *Server) isAdminPath(path string) bool {
+	adminPathPrefix := server.config.adminPathPrefix
+	if !strings.HasPrefix(path, adminPathPrefix) {
 		return false
 	}
-	if strings.HasSuffix(adminPath, "/") {
+	if strings.HasSuffix(adminPathPrefix, "/") {
 		return true
 	}
-	suffix := strings.TrimPrefix(path, adminPath)
+	suffix := strings.TrimPrefix(path, adminPathPrefix)
 	return suffix == "" || suffix[0] == '?' || suffix[0] == '/'
 }
 
 // TODO: rename
 func (server *Server) handleCreateEndpoint(w http.ResponseWriter, req *http.Request) error {
 	site := server.getSite(req)
-	if isBuiltin(site) {
-		return ChangeBuiltinSiteError()
+	if !canChange(site) {
+		return CantChangeBuiltinSiteError()
 	}
-	contains, err := server.storage.ContainsSite(site)
+	siteExists, err := server.storage.SiteExists(site)
 	if err != nil {
 		return err
 	}
-	if !contains {
+	if !siteExists {
 		// TODO: show a long help text here (like in handleUnknownEndpoint)
 		return UnknownSiteError(site)
 	}
@@ -441,16 +446,17 @@ func (server *Server) getSite(req *http.Request) string {
 		return EMPTY_SITE
 	}
 	subdomain := getSubdomain(req.Host)
-	if server.isCreateEndpoint(req) {
+	if server.isAdmin(req) {
 		return strings.TrimPrefix(subdomain, ADMIN_SUBDOMAIN_PREFIX)
 	}
 	return subdomain
 }
 
-func isBuiltin(site string) bool {
-	return isCreate(site) || isDefault(site)
+func canChange(site string) bool {
+	return !isCreate(site) && !isDefault(site)
 }
 
+// TODO: rename
 func isCreate(site string) bool {
 	return site == CREATE_SUBDOMAIN
 }
@@ -463,14 +469,6 @@ func isDefault(site string) bool {
 	return i <= MAX_STATUS_CODE
 }
 
-func (server *Server) getEndpointPath(req *http.Request) string {
-	if server.isInSingleSiteMode() {
-		path := strings.TrimPrefix(req.URL.Path, server.config.adminPathPrefix)
-		return ensureHasPrefix(path, "/")
-	}
-	return req.URL.Path
-}
-
 func ensureHasPrefix(s, prefix string) string {
 	if !strings.HasPrefix(s, prefix) {
 		return prefix + s
@@ -478,7 +476,7 @@ func ensureHasPrefix(s, prefix string) string {
 	return s
 }
 
-func applyEndpoint(endpoint *Endpoint, w http.ResponseWriter) {
+func respondWith(endpoint *Endpoint, w http.ResponseWriter) {
 	time.Sleep(endpoint.Delay)
 	addHeaders(endpoint.Headers, w.Header())
 	w.WriteHeader(endpoint.StatusCode)
@@ -486,8 +484,8 @@ func applyEndpoint(endpoint *Endpoint, w http.ResponseWriter) {
 }
 
 func addHeaders(headers map[string]string, responseHeader http.Header) {
-	for key, value := range headers {
-		responseHeader.Add(key, value)
+	for header, value := range headers {
+		responseHeader.Add(header, value)
 	}
 }
 
@@ -495,7 +493,7 @@ func (server *Server) handleUnknownEndpoint(w http.ResponseWriter, req *http.Req
 	w.WriteHeader(http.StatusNotFound)
 
 	site := server.getSite(req)
-	containsSite, err := server.storage.ContainsSite(site)
+	siteExists, err := server.storage.SiteExists(site)
 	if err != nil {
 		return err
 	}
@@ -521,10 +519,10 @@ func (server *Server) handleUnknownEndpoint(w http.ResponseWriter, req *http.Req
 		fmt.Fprintln(w)
 		CREATE_SITE_EXAMPLE_TEMPLATE.Execute(w, exampleTemplateData)
 
-	case isBuiltin(site):
+	case !canChange(site):
 		UNKNOWN_ERROR_TEMPLATE.Execute(w, templateData)
 
-	case !containsSite:
+	case !siteExists:
 		exampleTemplateData := *templateData
 		exampleTemplateData.TruncatedResponse = "hohoho"
 		UNKNOWN_SITE_TEMPLATE.Execute(w, templateData)
@@ -545,6 +543,7 @@ func (server *Server) createDefaultEndpoints() {
 	server.createSitesInRange(MIN_STATUS_CODE, MAX_STATUS_CODE)
 }
 
+// TODO: extract the for loop body to a separate method
 func (server *Server) createSitesInRange(minSite, maxSite int) {
 	for i := minSite; i <= maxSite; i++ {
 		site := strconv.Itoa(i)
@@ -558,7 +557,7 @@ func (server *Server) createSitesInRange(minSite, maxSite int) {
 			Method:     MATCHES_ANY_STRING,
 			Headers:    server.headersFor(i),
 			Delay:      server.delayFor(i),
-			StatusCode: server.statusFor(i),
+			StatusCode: server.statusCodeFor(i),
 			Response:   DEFAULT_RESPONSE,
 		}
 		err = server.storage.SaveEndpoint(endpoint)
@@ -570,8 +569,8 @@ func (server *Server) createSitesInRange(minSite, maxSite int) {
 
 func (server *Server) headersFor(site int) map[string]string {
 	if isRedirect(site) {
-		host := fmt.Sprintf("//%s", server.makeFullDomain(ZERO_DELAY_SITE))
-		return map[string]string{"Location": host}
+		zeroDelayURL := fmt.Sprintf("//%s", server.makeFullDomain(ZERO_DELAY_SITE))
+		return map[string]string{"Location": zeroDelayURL}
 	}
 	return EMPTY_HEADERS
 }
@@ -581,13 +580,14 @@ func isRedirect(statusCode int) bool {
 }
 
 func (server *Server) delayFor(site int) time.Duration {
-	if time.Duration(site)*time.Second <= MAX_DELAY {
-		return time.Duration(site) * time.Second
+	delay := time.Duration(site) * time.Second
+	if delay <= MAX_DELAY {
+		return delay
 	}
 	return time.Duration(0)
 }
 
-func (server *Server) statusFor(site int) int {
+func (server *Server) statusCodeFor(site int) int {
 	if site >= MIN_STATUS_CODE && site <= MAX_STATUS_CODE {
 		return site
 	}
@@ -595,11 +595,11 @@ func (server *Server) statusFor(site int) int {
 }
 
 func (server *Server) ensureEmptySiteExists() {
-	contains, err := server.storage.ContainsSite(EMPTY_SITE)
+	emptyExists, err := server.storage.SiteExists(EMPTY_SITE)
 	if err != nil {
 		log.Fatal(err)
 	}
-	if !contains {
+	if !emptyExists {
 		err = server.storage.CreateSite(EMPTY_SITE)
 		if err != nil {
 			log.Fatal(err)

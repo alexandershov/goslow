@@ -41,7 +41,7 @@ func DelayIsTooBigError(delay time.Duration) error {
 		MAX_DELAY, delay)
 }
 
-func ChangeBuiltinSiteError() error {
+func CantChangeBuiltinSiteError() error {
 	return NewApiError(http.StatusForbidden, "Oopsie daisy! You can't change builtin sites.")
 }
 
