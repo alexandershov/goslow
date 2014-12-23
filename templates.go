@@ -37,24 +37,24 @@ curl -d "{{ .TruncatedResponse }}" "{{ .AdminDomain }}{{ .AdminPathPrefix }}{{ .
 ... and you're done!
 `)
 
-	// TODO: remove duplication with EXAMPLE_ADD_ENDPOINT_TEMPLATE
 	EXAMPLE_CREATE_SITE_TEMPLATE = makeTemplate("create site example",
 		`Example:
-To create a new site make a POST request ...
+To create a new site just make a POST request ...
 curl -d "{{ .TruncatedResponse }}" "{{ .CreateDomain }}{{ .AdminPathPrefix }}{{ .Path }}?delay=2.5&method=GET"
+
 ... and you're done!
 `)
 
 	SITE_CREATED_TEMPLATE = makeTemplate("site created",
 		`Your personal goslow domain is {{ .Domain }}
-You can configure it with POST requests to {{ .AdminDomain }}
+You can configure it with the POST requests to {{ .AdminDomain }}
 `)
 
 	ENDPOINT_ADDED_TEMPLATE = makeTemplate("endpoint added",
-		`Hooray!
-Endpoint http://{{ .Domain }}{{ .Path }} responds to {{if .Method }}{{ .Method }}{{else}}any HTTP method{{ end }} {{ if .Delay }}with {{ .Delay }} delay{{ else }}without any delay{{end}}.
-Response is: {{ if .TruncatedResponse }}{{ .TruncatedResponse }}{{ else }}<EMPTY>{{ end }}
-`)
+		"Hooray!"+
+			"Endpoint http://{{ .Domain }}{{ .Path }} responds to {{if .Method }}{{ .Method }}{{else}}any HTTP method{{ end }} "+
+			"{{ if .Delay }}with {{ .Delay }} delay{{ else }}without any delay{{end}}."+
+			"Response is: {{ if .TruncatedResponse }}{{ .TruncatedResponse }}{{ else }}<EMPTY>{{ end }}")
 
 	UNKNOWN_ENDPOINT_TEMPLATE = makeTemplate("unknown endpoint",
 		`Oopsie daisy! Endpoint http://{{ .Domain }}{{ .Path }} isn't configured yet.
