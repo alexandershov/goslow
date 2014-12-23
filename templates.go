@@ -6,25 +6,27 @@ import (
 )
 
 type TemplateData struct {
-	Site              string
+	Site              string // e.g k38skjdf
 	Path              string
 	Method            string
 	Delay             time.Duration
 	TruncatedResponse string
-	CreateDomain      string
-	Domain            string
-	AdminDomain       string
+	CreateDomain      string // e.g create.goslow.link
+	Domain            string // e.g k38skjdf.goslow.link
+	AdminDomain       string // e.g admin-k38skjdf.goslow.link
 	AdminPathPrefix   string
 }
 
-// TODO: add helper to create templates easily
+func makeTemplate(name, text string) *template.Template {
+	return template.Must(template.New(name).Parse(text))
+}
 
 var (
-	BANNER_TEMPLATE = template.Must(template.New("banner").Parse(
+	BANNER_TEMPLATE = makeTemplate("banner",
 		`===================== goslow ====================
-`))
+`)
 
-	ADD_ENDPOINT_EXAMPLE_TEMPLATE = template.Must(template.New("add endpoint example").Parse(
+	ADD_ENDPOINT_EXAMPLE_TEMPLATE = makeTemplate("add endpoint example",
 		`Example:
 Let's say you want to add an endpoint {{ .Path }}
 and you want it to respond to GET requests with "{{ .TruncatedResponse }}" and 2.5 seconds delay.
@@ -33,50 +35,51 @@ Just make a POST request to your admin domain ...
 curl -d "{{ .TruncatedResponse }}" "{{ .AdminDomain }}{{ .AdminPathPrefix }}{{ .Path }}?delay=2.5&method=GET"
 
 ... and you're done!
-`))
+`)
 
 	// TODO: remove duplication with ADD_ENDPOINT_EXAMPLE_TEMPLATE
-	CREATE_SITE_EXAMPLE_TEMPLATE = template.Must(template.New("create site example").Parse(
+	CREATE_SITE_EXAMPLE_TEMPLATE = makeTemplate("create site example",
 		`Example:
 To create a new site make a POST request ...
 curl -d "{{ .TruncatedResponse }}" "{{ .CreateDomain }}{{ .AdminPathPrefix }}{{ .Path }}?delay=2.5&method=GET"
 ... and you're done!
-`))
+`)
 
-	SITE_CREATED_TEMPLATE = template.Must(template.New("site created").Parse(
+	SITE_CREATED_TEMPLATE = makeTemplate("site created",
 		`Your personal goslow domain is {{ .Domain }}
 You can configure it with POST requests to {{ .AdminDomain }}
-`))
+`)
 
-	ENDPOINT_ADDED_TEMPLATE = template.Must(template.New("endpoint added").Parse(
+	ENDPOINT_ADDED_TEMPLATE = makeTemplate("endpoint added",
 		`Hooray!
 Endpoint http://{{ .Domain }}{{ .Path }} responds to {{if .Method }}{{ .Method }}{{else}}any HTTP method{{ end }} {{ if .Delay }}with {{ .Delay }} delay{{ else }}without any delay{{end}}.
 Response is: {{ if .TruncatedResponse }}{{ .TruncatedResponse }}{{ else }}<EMPTY>{{ end }}
-`))
+`)
 
-	UNKNOWN_ENDPOINT_TEMPLATE = template.Must(template.New("unknown endpoint").Parse(
+	UNKNOWN_ENDPOINT_TEMPLATE = makeTemplate("unknown endpoint",
 		`Oopsie daisy! Endpoint http://{{ .Domain }}{{ .Path }} isn't configured yet.
-`))
+`)
 
 	// TODO: rename, too similary to SITE_CREATED_TEMPLATE
 	// TODO: remove duplication with SITE_CREATED_TEMPLATE
-	CREATE_SITE_HELP_TEMPLATE = template.Must(template.New("create site help").Parse(
+	CREATE_SITE_HELP_TEMPLATE = makeTemplate("create site help",
 		`Oopsie daisy!
 Make a POST request to http://{{ .CreateDomain }} to create new endpoints.
-`))
+`)
 
 	// TODO: rename
-	UNKNOWN_ERROR_TEMPLATE = template.Must(template.New("unknown error").Parse(
+	UNKNOWN_ERROR_TEMPLATE = makeTemplate("unknown error",
 		`Oopsie daisy! Server is probably misconfigured. It's not your fault.
 
 Please contact codumentary.com@gmail.com for help.
-`))
+`)
 
 	// TODO: create.link should depend on config.deployedOn
-	UNKNOWN_SITE_TEMPLATE = template.Must(template.New("unknown site").Parse(
+	UNKNOWN_SITE_TEMPLATE = makeTemplate("unknown site",
 		`Oopsie daisy! Site {{ .Site }} doesn't exist.
-`))
+`)
 
-	CONTACT_TEMPLATE = template.Must(template.New("contact").Parse(
-		`If you have any questions, don't hesitate to ask: codumentary.com@gmail.com`))
+	CONTACT_TEMPLATE = makeTemplate("contact",
+		`If you have any questions, don't hesitate to ask: codumentary.com@gmail.com
+`)
 )
