@@ -26,7 +26,7 @@ var (
 		`===================== goslow ====================
 `)
 
-	ADD_ENDPOINT_EXAMPLE_TEMPLATE = makeTemplate("add endpoint example",
+	EXAMPLE_ADD_ENDPOINT_TEMPLATE = makeTemplate("add endpoint example",
 		`Example:
 Let's say you want to add an endpoint {{ .Path }}
 and you want it to respond to GET requests with "{{ .TruncatedResponse }}" and 2.5 seconds delay.
@@ -37,8 +37,8 @@ curl -d "{{ .TruncatedResponse }}" "{{ .AdminDomain }}{{ .AdminPathPrefix }}{{ .
 ... and you're done!
 `)
 
-	// TODO: remove duplication with ADD_ENDPOINT_EXAMPLE_TEMPLATE
-	CREATE_SITE_EXAMPLE_TEMPLATE = makeTemplate("create site example",
+	// TODO: remove duplication with EXAMPLE_ADD_ENDPOINT_TEMPLATE
+	EXAMPLE_CREATE_SITE_TEMPLATE = makeTemplate("create site example",
 		`Example:
 To create a new site make a POST request ...
 curl -d "{{ .TruncatedResponse }}" "{{ .CreateDomain }}{{ .AdminPathPrefix }}{{ .Path }}?delay=2.5&method=GET"
@@ -62,7 +62,7 @@ Response is: {{ if .TruncatedResponse }}{{ .TruncatedResponse }}{{ else }}<EMPTY
 
 	// TODO: rename, too similary to SITE_CREATED_TEMPLATE
 	// TODO: remove duplication with SITE_CREATED_TEMPLATE
-	CREATE_SITE_HELP_TEMPLATE = makeTemplate("create site help",
+	HELP_CREATE_SITE_TEMPLATE = makeTemplate("create site help",
 		`Oopsie daisy!
 Make a POST request to http://{{ .CreateDomain }} to create new endpoints.
 `)

@@ -335,7 +335,7 @@ func (server *Server) showLongCreateSiteHelp(w http.ResponseWriter, endpoint *En
 	fmt.Fprintln(w)
 	SITE_CREATED_TEMPLATE.Execute(w, templateData)
 	fmt.Fprintln(w)
-	ADD_ENDPOINT_EXAMPLE_TEMPLATE.Execute(w, server.makeTemplateData(server.makeExampleEndpoint(endpoint)))
+	EXAMPLE_ADD_ENDPOINT_TEMPLATE.Execute(w, server.makeTemplateData(server.makeExampleEndpoint(endpoint)))
 }
 
 func (server *Server) makeTemplateData(endpoint *Endpoint) *TemplateData {
@@ -509,15 +509,15 @@ func (server *Server) handleUnknownEndpoint(w http.ResponseWriter, req *http.Req
 		exampleTemplateData.TruncatedResponse = "hohoho"
 		// TODO: why do we need both templateData and exampleTemplateData?
 		UNKNOWN_ENDPOINT_TEMPLATE.Execute(w, templateData)
-		ADD_ENDPOINT_EXAMPLE_TEMPLATE.Execute(w, exampleTemplateData)
+		EXAMPLE_ADD_ENDPOINT_TEMPLATE.Execute(w, exampleTemplateData)
 
 	case isCreate(site):
 		exampleTemplateData := *templateData
 		exampleTemplateData.TruncatedResponse = "hohoho"
-		CREATE_SITE_HELP_TEMPLATE.Execute(w, templateData)
+		HELP_CREATE_SITE_TEMPLATE.Execute(w, templateData)
 		fmt.Fprintln(w) // TODO: why we need two calls to Fprintln?
 		fmt.Fprintln(w)
-		CREATE_SITE_EXAMPLE_TEMPLATE.Execute(w, exampleTemplateData)
+		EXAMPLE_CREATE_SITE_TEMPLATE.Execute(w, exampleTemplateData)
 
 	case !canChange(site):
 		UNKNOWN_ERROR_TEMPLATE.Execute(w, templateData)
@@ -526,14 +526,14 @@ func (server *Server) handleUnknownEndpoint(w http.ResponseWriter, req *http.Req
 		exampleTemplateData := *templateData
 		exampleTemplateData.TruncatedResponse = "hohoho"
 		UNKNOWN_SITE_TEMPLATE.Execute(w, templateData)
-		CREATE_SITE_EXAMPLE_TEMPLATE.Execute(w, exampleTemplateData)
+		EXAMPLE_CREATE_SITE_TEMPLATE.Execute(w, exampleTemplateData)
 
 	default: // when will this branch be chosen?
 		exampleTemplateData := *templateData
 		exampleTemplateData.TruncatedResponse = "hohoho"
 		// TODO: why do we need both templateData and exampleTemplateData?
 		UNKNOWN_ENDPOINT_TEMPLATE.Execute(w, templateData)
-		ADD_ENDPOINT_EXAMPLE_TEMPLATE.Execute(w, exampleTemplateData)
+		EXAMPLE_ADD_ENDPOINT_TEMPLATE.Execute(w, exampleTemplateData)
 	}
 	return nil
 }
