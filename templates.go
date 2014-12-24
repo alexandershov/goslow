@@ -26,7 +26,7 @@ var (
 		`===================== goslow ====================
 `)
 
-	EXAMPLE_ADD_ENDPOINT_TEMPLATE = makeTemplate("add endpoint example",
+	EXAMPLE_ADD_ENDPOINT_TEMPLATE = makeTemplate("example add endpoint",
 		`Example:
 Let's say you want to add an endpoint {{ .Path }}
 and you want it to respond to GET requests with "{{ .TruncatedResponse }}" and 2.5 seconds delay.
@@ -37,7 +37,7 @@ curl -d "{{ .TruncatedResponse }}" "{{ .AdminDomain }}{{ .AdminPathPrefix }}{{ .
 ... and you're done!
 `)
 
-	EXAMPLE_CREATE_SITE_TEMPLATE = makeTemplate("create site example",
+	EXAMPLE_CREATE_SITE_TEMPLATE = makeTemplate("example create site",
 		`Example:
 To create a new site just make a POST request ...
 curl -d "{{ .TruncatedResponse }}" "{{ .CreateDomain }}{{ .AdminPathPrefix }}{{ .Path }}?delay=2.5&method=GET"
@@ -51,18 +51,17 @@ You can configure it with the POST requests to {{ .AdminDomain }}
 `)
 
 	ENDPOINT_ADDED_TEMPLATE = makeTemplate("endpoint added",
-		"Hooray!"+
-			"Endpoint http://{{ .Domain }}{{ .Path }} responds to {{if .Method }}{{ .Method }}{{else}}any HTTP method{{ end }} "+
-			"{{ if .Delay }}with {{ .Delay }} delay{{ else }}without any delay{{end}}."+
-			"Response is: {{ if .TruncatedResponse }}{{ .TruncatedResponse }}{{ else }}<EMPTY>{{ end }}")
+		"Hooray!\n"+
+			"Endpoint http://{{ .Domain }}{{ .Path }} responds to {{ or .Method \"any HTTP Method\"}} "+
+			"{{ if .Delay }}with {{ .Delay }} delay{{ else }}without any delay{{end}}.\n"+
+			"Response is: {{ or .TruncatedResponse \"<EMPTY>\"}}\n")
 
 	UNKNOWN_ENDPOINT_TEMPLATE = makeTemplate("unknown endpoint",
-		`Oopsie daisy! Endpoint http://{{ .Domain }}{{ .Path }} isn't configured yet.
+		`Oopsie daisy!
+Endpoint http://{{ .Domain }}{{ .Path }} isn't configured yet.
 `)
 
-	// TODO: rename, too similary to SITE_CREATED_TEMPLATE
-	// TODO: remove duplication with SITE_CREATED_TEMPLATE
-	HELP_CREATE_SITE_TEMPLATE = makeTemplate("create site help",
+	HELP_CREATE_SITE_TEMPLATE = makeTemplate("help create site",
 		`Oopsie daisy!
 Make a POST request to http://{{ .CreateDomain }} to create new endpoints.
 `)
@@ -74,12 +73,7 @@ Make a POST request to http://{{ .CreateDomain }} to create new endpoints.
 Please contact codumentary.com@gmail.com for help.
 `)
 
-	// TODO: create.link should depend on config.deployedOn
 	UNKNOWN_SITE_TEMPLATE = makeTemplate("unknown site",
 		`Oopsie daisy! Site {{ .Site }} doesn't exist.
-`)
-
-	CONTACT_TEMPLATE = makeTemplate("contact",
-		`If you have any questions, don't hesitate to ask: codumentary.com@gmail.com
 `)
 )
