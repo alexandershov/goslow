@@ -134,17 +134,20 @@ func shouldRespondWith(t *testing.T, expectedResponse []byte, request *http.Requ
 }
 
 func TestTooLargeDelay(t *testing.T) {
-	runAll(t, checkTooLargeDelay, multiDomainTestCases)
+	runAll(t, tooLargeDelayServerTest, multiDomainTestCases)
 }
 
-func checkTooLargeDelay(t *testing.T, server *httptest.Server, testCase *TestCase) {
-	prefix := testCase.adminPathPrefix
-	domain := newDomain(server, join(prefix, "/booya"), []byte("haha"))
+func tooLargeDelayServerTest(t *testing.T, server *httptest.Server, testCase *TestCase) {
+	domain := createDomain(server, &Endpoint{Path: testCase.endpointCreationPath("/booya"), Response: []byte("haha")})
 	site := getSite(domain)
 	resp := createEndpoint(server, &Endpoint{Site: site, Delay: time.Duration(1000) * time.Second})
 	shouldHaveStatusCode(t, http.StatusBadRequest, resp)
 	resp = GET(server.URL, "/", domain)
 	shouldHaveStatusCode(t, http.StatusNotFound, resp)
+}
+
+func (testCase *TestCase) endpointCreationPath(desiredPath string) string {
+	return join(testCase.adminPathPrefix, desiredPath)
 }
 
 func TestRedefineBuiltinSites(t *testing.T) {
@@ -210,7 +213,7 @@ func checkEndpointCreationTestCase(t *testing.T, server *httptest.Server, testCa
 		resp := createEndpoint(server, &Endpoint{Path: join(prefix, "/"), Response: root_response})
 		shouldHaveStatusCode(t, http.StatusOK, resp)
 	} else {
-		domain = newDomain(server, join(prefix, "/"), root_response)
+		domain = createDomain(server, &Endpoint{Path: join(prefix, "/"), Response: root_response})
 		site = getSite(domain)
 	}
 
@@ -317,9 +320,9 @@ func toDuration(seconds float64) time.Duration {
 	return time.Duration(seconds*1000) * time.Millisecond
 }
 
-func newDomain(server *httptest.Server, path string, response []byte) string {
-	resp := POST(server.URL, fmt.Sprintf("%s?output=short&method=GET", path),
-		makeFullDomain("create"), response)
+func createDomain(server *httptest.Server, endpoint *Endpoint) string {
+	resp := POST(server.URL, fmt.Sprintf("%s?output=short&method=GET", endpoint.Path),
+		makeFullDomain("create"), endpoint.Response)
 	return string(read(resp))
 }
 
