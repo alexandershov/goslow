@@ -18,114 +18,123 @@ import (
 )
 
 const (
-	ANY_DB_DRIVER    = ""
-	TEST_DEPLOYED_ON = "localhost:9999"
-	TEST_DB          = "goslow_test"
+	ANY_DB_DRIVER     = ""
+	MULTI_DOMAIN_MODE = ""
+	TEST_DEPLOYED_ON  = "localhost:9999"
+	TEST_DB           = "goslow_test"
 )
 
 var DATA_SOURCE = map[string]string{
-	"sqlite3":  DEFAULT_CONFIG.dataSource,
-	"postgres": "postgres://localhost/" + TEST_DB,
+	ANY_DB_DRIVER: "", // value doesn't matter
+	"sqlite3":     DEFAULT_CONFIG.dataSource,
+	"postgres":    "postgres://localhost/" + TEST_DB,
 }
 
 type TestCase struct {
-	createDefaultEndpoints bool
-	adminPathPrefix        string
 	driver                 string
 	dataSource             string
+	createDefaultEndpoints bool
+	adminPathPrefix        string
 }
 
 type TestCases []*TestCase
 
-type CheckFunc func(*testing.T, *httptest.Server, *TestCase)
+type ServerTest func(*testing.T, *httptest.Server, *TestCase)
 
 var (
-	defaultTestCases = TestCases{
-		NewTestCase(true, "", ANY_DB_DRIVER),
+	multiDomainTestCases = TestCases{
+		NewTestCase(ANY_DB_DRIVER, MULTI_DOMAIN_MODE),
 	}
 
 	endpointCreationTestCases = TestCases{
-		NewTestCase(true, "", ANY_DB_DRIVER),
-		NewTestCase(false, "/goslow", ANY_DB_DRIVER),
-		NewTestCase(false, "/goslow/", ANY_DB_DRIVER),
-		NewTestCase(false, "/te", ANY_DB_DRIVER),
-		NewTestCase(false, "/te/", ANY_DB_DRIVER),
-		NewTestCase(false, "/composite/path", ANY_DB_DRIVER),
+		NewTestCase(ANY_DB_DRIVER, MULTI_DOMAIN_MODE),
+		NewTestCase(ANY_DB_DRIVER, "/goslow"),
+		NewTestCase(ANY_DB_DRIVER, "/goslow/"),
+		NewTestCase(ANY_DB_DRIVER, "/te"),
+		NewTestCase(ANY_DB_DRIVER, "/te/"),
+		NewTestCase(ANY_DB_DRIVER, "/composite/path"),
 	}
 )
 
-func NewTestCase(createDefaultEndpoints bool, adminPathPrefix string, driver string) *TestCase {
+func NewTestCase(driver string, adminPathPrefix string) *TestCase {
 	dataSource, knownDriver := DATA_SOURCE[driver]
-	if driver != ANY_DB_DRIVER && !knownDriver {
+	if !knownDriver {
 		log.Fatalf("unknown driver: <%s>", driver)
 	}
+	createDefaultEndpoints := (adminPathPrefix == MULTI_DOMAIN_MODE)
 	return &TestCase{
-		createDefaultEndpoints: createDefaultEndpoints,
-		adminPathPrefix:        adminPathPrefix,
 		driver:                 driver,
 		dataSource:             dataSource,
+		createDefaultEndpoints: createDefaultEndpoints,
+		adminPathPrefix:        adminPathPrefix,
 	}
 }
 
 func TestZeroSite(t *testing.T) {
-	runAll(t, checkZeroSite, defaultTestCases)
+	runAll(t, zeroSiteServerTest, multiDomainTestCases)
 }
 
-func runAll(t *testing.T, checkFunc CheckFunc, testCases TestCases) {
-	for _, testCase := range runnable(all(testCases)) {
-		run(t, checkFunc, testCase)
+func runAll(t *testing.T, serverTest ServerTest, testCases TestCases) {
+	for _, testCase := range runnable(expandToConcreteDriver(testCases)) {
+		run(t, serverTest, testCase)
 	}
 }
 
 func runnable(testCases TestCases) TestCases {
 	runnableTestCases := make(TestCases, 0)
 	for _, testCase := range testCases {
-		if !testCase.skippable() {
+		if testCase.runnable() {
 			runnableTestCases = append(runnableTestCases, testCase)
 		}
 	}
 	return runnableTestCases
 }
 
-func all(testCases TestCases) TestCases {
-	allTestCases := make(TestCases, 0)
+func expandToConcreteDriver(testCases TestCases) TestCases {
+	concreteTestCases := make(TestCases, 0)
 	for _, testCase := range testCases {
 		if testCase.driver == ANY_DB_DRIVER {
-			sqlite3TestCase := NewTestCase(testCase.createDefaultEndpoints, testCase.adminPathPrefix, "sqlite3")
-			postgresTestCase := NewTestCase(testCase.createDefaultEndpoints, testCase.adminPathPrefix, "postgres")
-			allTestCases = append(allTestCases, sqlite3TestCase)
-			allTestCases = append(allTestCases, postgresTestCase)
+			concreteTestCases = append(concreteTestCases, NewTestCase("sqlite3", testCase.adminPathPrefix))
+			concreteTestCases = append(concreteTestCases, NewTestCase("postgres", testCase.adminPathPrefix))
 		} else {
-			allTestCases = append(allTestCases, testCase)
+			concreteTestCases = append(concreteTestCases, testCase)
 		}
 	}
-	return allTestCases
+	return concreteTestCases
+}
+
+func (testCase *TestCase) runnable() bool {
+	return !testCase.skippable()
 }
 
 func (testCase *TestCase) skippable() bool {
 	return testCase.driver == "postgres" && testing.Short()
 }
 
-func run(t *testing.T, checkFunc CheckFunc, testCase *TestCase) {
+func run(t *testing.T, serverTest ServerTest, testCase *TestCase) {
 	if testCase.driver == "postgres" {
 		createDb(TEST_DB)
 		defer dropDb(TEST_DB)
 	}
-	goSlowServer := newSubDomainServer(testCase)
+	goSlowServer := newGoSlowServer(testCase)
 	server := httptest.NewServer(goSlowServer)
 	defer server.Close()
-	defer goSlowServer.storage.db.Close()
-	checkFunc(t, server, testCase)
+	defer goSlowServer.storage.db.Close() // so we can drop database
+	serverTest(t, server, testCase)
 }
 
-func checkZeroSite(t *testing.T, server *httptest.Server, testCase *TestCase) {
-	bytesShouldBeEqual(t,
-		read(GET(server.URL, "/", makeHost("0", TEST_DEPLOYED_ON))),
-		DEFAULT_RESPONSE)
+func zeroSiteServerTest(t *testing.T, server *httptest.Server, testCase *TestCase) {
+	shouldRespondWith(t, DEFAULT_RESPONSE,
+		createGET(server.URL, "/", makeFullDomain("0")))
+}
+
+func shouldRespondWith(t *testing.T, expectedResponse []byte, request *http.Request) {
+	response := do(request)
+	bytesShouldBeEqual(t, expectedResponse, read(response))
 }
 
 func TestTooLargeDelay(t *testing.T) {
-	runAll(t, checkTooLargeDelay, defaultTestCases)
+	runAll(t, checkTooLargeDelay, multiDomainTestCases)
 }
 
 func checkTooLargeDelay(t *testing.T, server *httptest.Server, testCase *TestCase) {
@@ -139,7 +148,7 @@ func checkTooLargeDelay(t *testing.T, server *httptest.Server, testCase *TestCas
 }
 
 func TestRedefineBuiltinSites(t *testing.T) {
-	runAll(t, checkRedefineBuiltinSites, defaultTestCases)
+	runAll(t, checkRedefineBuiltinSites, multiDomainTestCases)
 }
 
 func checkRedefineBuiltinSites(t *testing.T, server *httptest.Server, testCase *TestCase) {
@@ -150,7 +159,7 @@ func checkRedefineBuiltinSites(t *testing.T, server *httptest.Server, testCase *
 }
 
 func TestRedefineNonExistentSite(t *testing.T) {
-	runAll(t, checkRedefineNonExistentSite, defaultTestCases)
+	runAll(t, checkRedefineNonExistentSite, multiDomainTestCases)
 }
 
 func checkRedefineNonExistentSite(t *testing.T, server *httptest.Server, testCase *TestCase) {
@@ -161,25 +170,25 @@ func checkRedefineNonExistentSite(t *testing.T, server *httptest.Server, testCas
 }
 
 func TestDelay(t *testing.T) {
-	runAll(t, checkDelay, defaultTestCases)
+	runAll(t, checkDelay, multiDomainTestCases)
 }
 
 func checkDelay(t *testing.T, server *httptest.Server, testCase *TestCase) {
 	shouldRespondIn(t,
-		createGET(server.URL, "/", makeHost("0", TEST_DEPLOYED_ON)),
+		createGET(server.URL, "/", makeFullDomain("0")),
 		0, 0.1) // seconds
 	shouldRespondIn(t,
-		createGET(server.URL, "/", makeHost("1", TEST_DEPLOYED_ON)),
+		createGET(server.URL, "/", makeFullDomain("1")),
 		1, 1.1) // seconds
 }
 
 func TestStatus(t *testing.T) {
-	runAll(t, checkStatus, defaultTestCases)
+	runAll(t, checkStatus, multiDomainTestCases)
 }
 
 func checkStatus(t *testing.T, server *httptest.Server, testCase *TestCase) {
 	for _, statusCode := range []int{200, 404, 500} {
-		resp := GET(server.URL, "/", makeHost(strconv.Itoa(statusCode), TEST_DEPLOYED_ON))
+		resp := GET(server.URL, "/", makeFullDomain(strconv.Itoa(statusCode)))
 		shouldHaveStatusCode(t, statusCode, resp)
 	}
 }
@@ -227,7 +236,7 @@ func checkEndpointCreationTestCase(t *testing.T, server *httptest.Server, testCa
 	shouldRespondIn(t, createPOST(server.URL, "/test", domain, empty_payload), 0.1, 0.15)
 }
 
-func newSubDomainServer(testCase *TestCase) *Server {
+func newGoSlowServer(testCase *TestCase) *Server {
 	config := DEFAULT_CONFIG // copies DEFAULT_CONFIG
 	config.deployedOn = TEST_DEPLOYED_ON
 	config.createDefaultEndpoints = testCase.createDefaultEndpoints
@@ -271,8 +280,8 @@ func read(resp *http.Response) []byte {
 	return body
 }
 
-func makeHost(subdomain, host string) string {
-	return fmt.Sprintf("%s.%s", subdomain, host)
+func makeFullDomain(site string) string {
+	return fmt.Sprintf("%s.%s", site, TEST_DEPLOYED_ON)
 }
 
 func bytesShouldBeEqual(t *testing.T, expected, actual []byte) {
@@ -310,7 +319,7 @@ func toDuration(seconds float64) time.Duration {
 
 func newDomain(server *httptest.Server, path string, response []byte) string {
 	resp := POST(server.URL, fmt.Sprintf("%s?output=short&method=GET", path),
-		makeHost("create", TEST_DEPLOYED_ON), response)
+		makeFullDomain("create"), response)
 	return string(read(resp))
 }
 
@@ -328,7 +337,7 @@ func getSite(domain string) string {
 }
 
 func createEndpoint(server *httptest.Server, endpoint *Endpoint) *http.Response {
-	req := createPOST(server.URL, endpoint.Path, makeHost("admin-"+endpoint.Site, TEST_DEPLOYED_ON),
+	req := createPOST(server.URL, endpoint.Path, makeFullDomain("admin-"+endpoint.Site),
 		endpoint.Response)
 	req.URL.RawQuery = getQueryString(endpoint)
 	return do(req)
