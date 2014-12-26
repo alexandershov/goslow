@@ -185,16 +185,17 @@ func changeUnknownSitesServerTest(t *testing.T, server *httptest.Server, testCas
 }
 
 func TestDelay(t *testing.T) {
-	runAll(t, checkDelay, multiDomainTestCases)
+	runAll(t, delayServerTest, multiDomainTestCases)
 }
 
-func checkDelay(t *testing.T, server *httptest.Server, testCase *TestCase) {
-	shouldRespondIn(t,
+func delayServerTest(t *testing.T, server *httptest.Server, testCase *TestCase) {
+	shouldRespondInTimeInterval(t, 0, 0.1, // seconds
 		createGET(server.URL, "/", makeFullDomain("0")),
-		0, 0.1) // seconds
-	shouldRespondIn(t,
+	)
+
+	shouldRespondInTimeInterval(t, 1, 1.1, // seconds
 		createGET(server.URL, "/", makeFullDomain("1")),
-		1, 1.1) // seconds
+	)
 }
 
 func TestStatus(t *testing.T) {
@@ -248,7 +249,7 @@ func checkEndpointCreationTestCase(t *testing.T, server *httptest.Server, testCa
 	bytesShouldBeEqual(t, read(GET(server.URL, "/test", domain)), test_response)
 	// checking that POST /test endpoint works
 	bytesShouldBeEqual(t, read(POST(server.URL, "/test", domain, empty_payload)), test_post_response)
-	shouldRespondIn(t, createPOST(server.URL, "/test", domain, empty_payload), 0.1, 0.15)
+	shouldRespondInTimeInterval(t, 0.1, 0.15, createPOST(server.URL, "/test", domain, empty_payload))
 }
 
 func newGoSlowServer(testCase *TestCase) *Server {
@@ -311,7 +312,7 @@ func intShouldBeEqual(t *testing.T, expected, actual int) {
 	}
 }
 
-func shouldRespondIn(t *testing.T, req *http.Request, minSeconds, maxSeconds float64) {
+func shouldRespondInTimeInterval(t *testing.T, minSeconds, maxSeconds float64, req *http.Request) {
 	start := time.Now()
 	resp := do(req)
 	read(resp)
