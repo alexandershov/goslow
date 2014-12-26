@@ -150,11 +150,11 @@ func dontAllowToCreateEndpointWithDelay(t *testing.T, server *httptest.Server, d
 	})
 }
 
-type DomainFunc func(domain string)
+type DomainTest func(domain string)
 
-func withNewDomain(server *httptest.Server, domainFunc DomainFunc) {
+func withNewDomain(server *httptest.Server, domainTest DomainTest) {
 	domain := createDomain(server, &Endpoint{Path: "/path-is-irrelevant"})
-	domainFunc(domain)
+	domainTest(domain)
 }
 
 func TestRedefineBuiltinSites(t *testing.T) {
