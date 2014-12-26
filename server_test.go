@@ -11,7 +11,6 @@ import (
 	"net/url"
 	"os/exec"
 	"path"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -184,11 +183,11 @@ func changeUnknownSitesServerTest(t *testing.T, server *httptest.Server, testCas
 	dontAllowToChangeSite(t, server, http.StatusNotFound, "admin-create")
 }
 
-func TestDelay(t *testing.T) {
-	runAll(t, delayServerTest, multiDomainTestCases)
+func TestDelaySites(t *testing.T) {
+	runAll(t, delaySitesServerTest, multiDomainTestCases)
 }
 
-func delayServerTest(t *testing.T, server *httptest.Server, testCase *TestCase) {
+func delaySitesServerTest(t *testing.T, server *httptest.Server, testCase *TestCase) {
 	shouldRespondInTimeInterval(t, 0, 0.1, // seconds
 		createGET(server.URL, "/", makeFullDomain("0")),
 	)
@@ -198,15 +197,20 @@ func delayServerTest(t *testing.T, server *httptest.Server, testCase *TestCase) 
 	)
 }
 
-func TestStatus(t *testing.T) {
-	runAll(t, checkStatus, multiDomainTestCases)
+func TestStatusSites(t *testing.T) {
+	runAll(t, statusSitesServerTest, multiDomainTestCases)
 }
 
-func checkStatus(t *testing.T, server *httptest.Server, testCase *TestCase) {
-	for _, statusCode := range []int{200, 404, 500} {
-		resp := GET(server.URL, "/", makeFullDomain(strconv.Itoa(statusCode)))
-		shouldHaveStatusCode(t, statusCode, resp)
-	}
+func statusSitesServerTest(t *testing.T, server *httptest.Server, testCase *TestCase) {
+	siteShouldRespondWith(t, server, 200, "200")
+	siteShouldRespondWith(t, server, 404, "404")
+	siteShouldRespondWith(t, server, 599, "599")
+}
+
+// TODO: do we need to carry server argument in this and similar functions?
+func siteShouldRespondWith(t *testing.T, server *httptest.Server, statusCode int, site string) {
+	resp := GET(server.URL, "/", makeFullDomain(site))
+	shouldHaveStatusCode(t, statusCode, resp)
 }
 
 func TestEndpointCreation(t *testing.T) {
@@ -325,6 +329,7 @@ func shouldRespondInTimeInterval(t *testing.T, minSeconds, maxSeconds float64, r
 	}
 }
 
+// TODO: shouldn't all should* methods accept *http.Request and not *http.Response?
 func shouldHaveStatusCode(t *testing.T, statusCode int, resp *http.Response) {
 	intShouldBeEqual(t, statusCode, resp.StatusCode)
 }
