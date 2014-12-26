@@ -39,6 +39,7 @@ type TestCase struct {
 
 type TestCases []*TestCase
 
+// TODO: do we need *TestCase argument in ServerTest?
 type ServerTest func(*testing.T, *httptest.Server, *TestCase)
 
 var (
@@ -157,15 +158,20 @@ func withNewDomain(server *httptest.Server, domainTest DomainTest) {
 	domainTest(domain)
 }
 
-func TestRedefineBuiltinSites(t *testing.T) {
-	runAll(t, checkRedefineBuiltinSites, multiDomainTestCases)
+func TestChangeBuiltinSites(t *testing.T) {
+	runAll(t, changeBuiltinSitesServerTest, multiDomainTestCases)
 }
 
-func checkRedefineBuiltinSites(t *testing.T, server *httptest.Server, testCase *TestCase) {
-	for _, site := range []string{"0", "99", "500", "create"} {
-		resp := createEndpoint(server, &Endpoint{Site: site, Path: "/test", Response: []byte("hop"), Method: "GET"})
-		shouldHaveStatusCode(t, http.StatusForbidden, resp)
-	}
+// TODO: test admin-599 sites
+func changeBuiltinSitesServerTest(t *testing.T, server *httptest.Server, testCase *TestCase) {
+	dontAllowToChangeSite(t, server, "0")
+	dontAllowToChangeSite(t, server, "599")
+	dontAllowToChangeSite(t, server, "create")
+}
+
+func dontAllowToChangeSite(t *testing.T, server *httptest.Server, site string) {
+	resp := createEndpoint(server, &Endpoint{Site: site, Path: "/test", Response: []byte("hop"), Method: "GET"})
+	shouldHaveStatusCode(t, http.StatusForbidden, resp)
 }
 
 func TestRedefineNonExistentSite(t *testing.T) {
