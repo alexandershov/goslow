@@ -138,16 +138,23 @@ func TestTooLargeDelay(t *testing.T) {
 }
 
 func tooLargeDelayServerTest(t *testing.T, server *httptest.Server, testCase *TestCase) {
-	domain := createDomain(server, &Endpoint{Path: testCase.endpointCreationPath("/booya"), Response: []byte("haha")})
-	site := getSite(domain)
-	resp := createEndpoint(server, &Endpoint{Site: site, Delay: time.Duration(1000) * time.Second})
-	shouldHaveStatusCode(t, http.StatusBadRequest, resp)
-	resp = GET(server.URL, "/", domain)
-	shouldHaveStatusCode(t, http.StatusNotFound, resp)
+	dontAllowToCreateEndpointWithDelay(t, server, time.Duration(1000)*time.Second)
 }
 
-func (testCase *TestCase) endpointCreationPath(desiredPath string) string {
-	return join(testCase.adminPathPrefix, desiredPath)
+func dontAllowToCreateEndpointWithDelay(t *testing.T, server *httptest.Server, delay time.Duration) {
+	withNewDomain(server, func(domain string) {
+		resp := createEndpoint(server, &Endpoint{Site: getSite(domain), Path: "/", Delay: delay})
+
+		shouldHaveStatusCode(t, http.StatusBadRequest, resp)
+		shouldHaveStatusCode(t, http.StatusNotFound, GET(server.URL, "/", domain))
+	})
+}
+
+type DomainFunc func(domain string)
+
+func withNewDomain(server *httptest.Server, domainFunc DomainFunc) {
+	domain := createDomain(server, &Endpoint{Path: "/path-is-irrelevant"})
+	domainFunc(domain)
 }
 
 func TestRedefineBuiltinSites(t *testing.T) {
