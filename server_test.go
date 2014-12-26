@@ -163,12 +163,12 @@ func TestChangeBuiltinSites(t *testing.T) {
 }
 
 func changeBuiltinSitesServerTest(t *testing.T, server *httptest.Server, testCase *TestCase) {
-	dontAllowToChangeSite(t, server, "0", http.StatusForbidden)
-	dontAllowToChangeSite(t, server, "599", http.StatusForbidden)
-	dontAllowToChangeSite(t, server, "create", http.StatusForbidden)
+	dontAllowToChangeSite(t, server, http.StatusForbidden, "0")
+	dontAllowToChangeSite(t, server, http.StatusForbidden, "599")
+	dontAllowToChangeSite(t, server, http.StatusForbidden, "create")
 }
 
-func dontAllowToChangeSite(t *testing.T, server *httptest.Server, site string, expectedStatusCode int) {
+func dontAllowToChangeSite(t *testing.T, server *httptest.Server, expectedStatusCode int, site string) {
 	resp := createEndpoint(server, &Endpoint{Site: site, Path: "/test", Response: []byte("hop"), Method: "GET"})
 	shouldHaveStatusCode(t, expectedStatusCode, resp)
 }
@@ -178,10 +178,10 @@ func TestChangeUnknownSites(t *testing.T) {
 }
 
 func changeUnknownSitesServerTest(t *testing.T, server *httptest.Server, testCase *TestCase) {
-	dontAllowToChangeSite(t, server, "", http.StatusNotFound)
-	dontAllowToChangeSite(t, server, "uknown-site", http.StatusNotFound)
-	dontAllowToChangeSite(t, server, "admin-500", http.StatusNotFound)
-	dontAllowToChangeSite(t, server, "admin-create", http.StatusNotFound)
+	dontAllowToChangeSite(t, server, http.StatusNotFound, "")
+	dontAllowToChangeSite(t, server, http.StatusNotFound, "uknown-site")
+	dontAllowToChangeSite(t, server, http.StatusNotFound, "admin-500")
+	dontAllowToChangeSite(t, server, http.StatusNotFound, "admin-create")
 }
 
 func TestDelay(t *testing.T) {
