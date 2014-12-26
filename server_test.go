@@ -162,27 +162,26 @@ func TestChangeBuiltinSites(t *testing.T) {
 	runAll(t, changeBuiltinSitesServerTest, multiDomainTestCases)
 }
 
-// TODO: test admin-599 sites
 func changeBuiltinSitesServerTest(t *testing.T, server *httptest.Server, testCase *TestCase) {
-	dontAllowToChangeSite(t, server, "0")
-	dontAllowToChangeSite(t, server, "599")
-	dontAllowToChangeSite(t, server, "create")
+	dontAllowToChangeSite(t, server, "0", http.StatusForbidden)
+	dontAllowToChangeSite(t, server, "599", http.StatusForbidden)
+	dontAllowToChangeSite(t, server, "create", http.StatusForbidden)
 }
 
-func dontAllowToChangeSite(t *testing.T, server *httptest.Server, site string) {
+func dontAllowToChangeSite(t *testing.T, server *httptest.Server, site string, expectedStatusCode int) {
 	resp := createEndpoint(server, &Endpoint{Site: site, Path: "/test", Response: []byte("hop"), Method: "GET"})
-	shouldHaveStatusCode(t, http.StatusForbidden, resp)
+	shouldHaveStatusCode(t, expectedStatusCode, resp)
 }
 
-func TestRedefineNonExistentSite(t *testing.T) {
-	runAll(t, checkRedefineNonExistentSite, multiDomainTestCases)
+func TestChangeUnknownSites(t *testing.T) {
+	runAll(t, changeUnknownSitesServerTest, multiDomainTestCases)
 }
 
-func checkRedefineNonExistentSite(t *testing.T, server *httptest.Server, testCase *TestCase) {
-	for _, site := range []string{"", "ha", "admin-500"} {
-		resp := createEndpoint(server, &Endpoint{Site: site})
-		shouldHaveStatusCode(t, http.StatusNotFound, resp)
-	}
+func changeUnknownSitesServerTest(t *testing.T, server *httptest.Server, testCase *TestCase) {
+	dontAllowToChangeSite(t, server, "", http.StatusNotFound)
+	dontAllowToChangeSite(t, server, "uknown-site", http.StatusNotFound)
+	dontAllowToChangeSite(t, server, "admin-500", http.StatusNotFound)
+	dontAllowToChangeSite(t, server, "admin-create", http.StatusNotFound)
 }
 
 func TestDelay(t *testing.T) {
