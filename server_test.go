@@ -214,10 +214,10 @@ func siteShouldRespondWith(t *testing.T, server *httptest.Server, statusCode int
 }
 
 func TestEndpointCreation(t *testing.T) {
-	runAll(t, checkEndpointCreationTestCase, endpointCreationTestCases)
+	runAll(t, endpointCreationServerTest, endpointCreationTestCases)
 }
 
-func checkEndpointCreationTestCase(t *testing.T, server *httptest.Server, testCase *TestCase) {
+func endpointCreationServerTest(t *testing.T, server *httptest.Server, testCase *TestCase) {
 	prefix := testCase.adminPathPrefix
 	isInSingleSiteMode := prefix != ""
 	domain, site := TEST_DEPLOYED_ON, ""
@@ -243,7 +243,7 @@ func checkEndpointCreationTestCase(t *testing.T, server *httptest.Server, testCa
 	bytesShouldBeEqual(t, read(GET(server.URL, "/test", domain)), test_response)
 	// checking that GET /test doesn't affect POST
 	resp = POST(server.URL, "/test", domain, []byte(""))
-	intShouldBeEqual(t, 404, resp.StatusCode)
+	intsShouldBeEqual(t, 404, resp.StatusCode)
 
 	// testing POST endpoint
 	resp = createEndpoint(server, &Endpoint{Site: site, Path: join(prefix, "/test"), Response: test_post_response, Method: "POST",
@@ -266,6 +266,9 @@ func newGoSlowServer(testCase *TestCase) *Server {
 	return NewServer(&config)
 }
 
+// TODO: is it okay to have 3 string arguments?
+// TODO: shouldn't host argument come first?
+// TODO: same for createGET, POST, and createPOST
 func GET(url, path, host string) *http.Response {
 	req := createGET(url, path, host)
 	return do(req)
@@ -283,7 +286,9 @@ func createGET(url, path, host string) *http.Request {
 	return createRequest("GET", url, path, host, nil)
 }
 
+// TODO: replace 4 string arguments with maybe template url.URL argument
 func createRequest(method, url, path, host string, body io.Reader) *http.Request {
+	// TODO: build url with url.URL.String() instead of string concatenation
 	req, err := http.NewRequest(method, url+path, body)
 	if err != nil {
 		log.Fatal(err)
@@ -310,7 +315,7 @@ func bytesShouldBeEqual(t *testing.T, expected, actual []byte) {
 	}
 }
 
-func intShouldBeEqual(t *testing.T, expected, actual int) {
+func intsShouldBeEqual(t *testing.T, expected, actual int) {
 	if expected != actual {
 		t.Fatalf("<<%v>> != <<%v>>", expected, actual)
 	}
@@ -320,9 +325,11 @@ func shouldRespondInTimeInterval(t *testing.T, minSeconds, maxSeconds float64, r
 	start := time.Now()
 	resp := do(req)
 	read(resp)
+
 	duration := time.Since(start)
-	minDuration := toDuration(minSeconds)
-	maxDuration := toDuration(maxSeconds)
+	minDuration := secondsToDuration(minSeconds)
+	maxDuration := secondsToDuration(maxSeconds)
+
 	if duration < minDuration || duration > maxDuration {
 		t.Fatalf("%s%s answered in %v. Not in the interval [%v; %v]",
 			req.Host, req.URL.Path, duration, minDuration, maxDuration)
@@ -331,13 +338,11 @@ func shouldRespondInTimeInterval(t *testing.T, minSeconds, maxSeconds float64, r
 
 // TODO: shouldn't all should* methods accept *http.Request and not *http.Response?
 func shouldHaveStatusCode(t *testing.T, statusCode int, resp *http.Response) {
-	intShouldBeEqual(t, statusCode, resp.StatusCode)
+	intsShouldBeEqual(t, statusCode, resp.StatusCode)
 }
 
-func toDuration(seconds float64) time.Duration {
-	return time.Duration(seconds*1000) * time.Millisecond
-}
-
+// TODO: build url with url.URL not Sprintf
+// TODO: endpoint is strange argument here, think of something better
 func createDomain(server *httptest.Server, endpoint *Endpoint) string {
 	resp := POST(server.URL, fmt.Sprintf("%s?output=short&method=GET", endpoint.Path),
 		makeFullDomain("create"), endpoint.Response)
@@ -376,24 +381,31 @@ func join(elem ...string) string {
 	lastElem := elem[len(elem)-1]
 	shouldEndWithSlash := strings.HasSuffix(lastElem, "/")
 	joined := path.Join(elem...)
-	if shouldEndWithSlash && !strings.HasSuffix(joined, "/") {
-		joined += "/"
+	if shouldEndWithSlash {
+		return ensureHasSuffix(joined, "/")
 	}
 	return joined
 }
 
+func ensureHasSuffix(s, suffix string) string {
+	if !strings.HasSuffix(s, suffix) {
+		return s + suffix
+	}
+	return s
+}
+
 func createDb(name string) {
-	cmd := exec.Command("createdb", name)
+	runCommand("createdb", name)
+}
+
+func runCommand(name string, arg ...string) {
+	cmd := exec.Command(name, arg...)
 	err := cmd.Run()
 	if err != nil {
-		log.Fatalf("createdb error: %s", err)
+		log.Fatalf("%s error: %s", name, err)
 	}
 }
 
 func dropDb(name string) {
-	cmd := exec.Command("dropdb", name)
-	err := cmd.Run()
-	if err != nil {
-		log.Fatalf("dropdb error: %s", err)
-	}
+	runCommand("dropdb", name)
 }
