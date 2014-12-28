@@ -202,13 +202,13 @@ func TestStatusSites(t *testing.T) {
 }
 
 func statusSitesServerTest(t *testing.T, server *httptest.Server, testCase *TestCase) {
-	siteShouldRespondWith(t, server, 200, "200")
-	siteShouldRespondWith(t, server, 404, "404")
-	siteShouldRespondWith(t, server, 599, "599")
+	siteShouldRespondWithStatusCode(t, server, 200, "200")
+	siteShouldRespondWithStatusCode(t, server, 404, "404")
+	siteShouldRespondWithStatusCode(t, server, 599, "599")
 }
 
 // TODO: do we need to carry server argument in this and similar functions?
-func siteShouldRespondWith(t *testing.T, server *httptest.Server, statusCode int, site string) {
+func siteShouldRespondWithStatusCode(t *testing.T, server *httptest.Server, statusCode int, site string) {
 	resp := GET(server.URL, "/", makeFullDomain(site))
 	shouldHaveStatusCode(t, statusCode, resp)
 }
