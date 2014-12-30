@@ -1,5 +1,7 @@
 package main
 
+// TODO: rename domain -> site where appropriate
+
 import (
 	"bytes"
 	"fmt"
@@ -17,258 +19,341 @@ import (
 )
 
 const (
-	ANY_DB_DRIVER     = ""
-	MULTI_DOMAIN_MODE = ""
-	TEST_DEPLOYED_ON  = "localhost:9999"
-	TEST_DB           = "goslow_test"
+	ANY_DB_DRIVER    = ""
+	MULTI_SITE_MODE  = ""
+	TEST_DEPLOYED_ON = "localhost:9999"
+	TEST_POSTGRES_DB = "goslow_test"
 )
 
 var DATA_SOURCE = map[string]string{
-	ANY_DB_DRIVER: "", // value doesn't matter
-	"sqlite3":     DEFAULT_CONFIG.dataSource,
-	"postgres":    "postgres://localhost/" + TEST_DB,
+	"sqlite3":  DEFAULT_CONFIG.dataSource,
+	"postgres": "postgres://localhost/" + TEST_POSTGRES_DB,
 }
 
-type TestCase struct {
-	driver                 string
-	dataSource             string
-	createDefaultEndpoints bool
-	adminPathPrefix        string
+type TestServer struct {
+	goSlowServer  *Server
+	runningServer *httptest.Server
 }
 
-type TestCases []*TestCase
+type ServerTest func(*TestServer)
 
-// TODO: do we need *TestCase argument in ServerTest?
-type ServerTest func(*testing.T, *httptest.Server, *TestCase)
+func TestCreateSite(t *testing.T) {
+	withNewMultiSiteServer(func(server *TestServer) {
 
-var (
-	multiDomainTestCases = TestCases{
-		NewTestCase(ANY_DB_DRIVER, MULTI_DOMAIN_MODE),
-	}
-
-	endpointCreationTestCases = TestCases{
-		NewTestCase(ANY_DB_DRIVER, MULTI_DOMAIN_MODE),
-		NewTestCase(ANY_DB_DRIVER, "/goslow"),
-		NewTestCase(ANY_DB_DRIVER, "/goslow/"),
-		NewTestCase(ANY_DB_DRIVER, "/te"),
-		NewTestCase(ANY_DB_DRIVER, "/te/"),
-		NewTestCase(ANY_DB_DRIVER, "/composite/path"),
-	}
-)
-
-func NewTestCase(driver string, adminPathPrefix string) *TestCase {
-	dataSource, knownDriver := DATA_SOURCE[driver]
-	if !knownDriver {
-		log.Fatalf("unknown driver: <%s>", driver)
-	}
-	createDefaultEndpoints := (adminPathPrefix == MULTI_DOMAIN_MODE)
-	return &TestCase{
-		driver:                 driver,
-		dataSource:             dataSource,
-		createDefaultEndpoints: createDefaultEndpoints,
-		adminPathPrefix:        adminPathPrefix,
-	}
-}
-
-func TestZeroSite(t *testing.T) {
-	runAll(t, zeroSiteServerTest, multiDomainTestCases)
-}
-
-func runAll(t *testing.T, serverTest ServerTest, testCases TestCases) {
-	for _, testCase := range runnable(expandToConcreteDriver(testCases)) {
-		run(t, serverTest, testCase)
-	}
-}
-
-func runnable(testCases TestCases) TestCases {
-	runnableTestCases := make(TestCases, 0)
-	for _, testCase := range testCases {
-		if testCase.runnable() {
-			runnableTestCases = append(runnableTestCases, testCase)
-		}
-	}
-	return runnableTestCases
-}
-
-func expandToConcreteDriver(testCases TestCases) TestCases {
-	concreteTestCases := make(TestCases, 0)
-	for _, testCase := range testCases {
-		if testCase.driver == ANY_DB_DRIVER {
-			concreteTestCases = append(concreteTestCases, NewTestCase("sqlite3", testCase.adminPathPrefix))
-			concreteTestCases = append(concreteTestCases, NewTestCase("postgres", testCase.adminPathPrefix))
-		} else {
-			concreteTestCases = append(concreteTestCases, testCase)
-		}
-	}
-	return concreteTestCases
-}
-
-func (testCase *TestCase) runnable() bool {
-	return !testCase.skippable()
-}
-
-func (testCase *TestCase) skippable() bool {
-	return testCase.driver == "postgres" && testing.Short()
-}
-
-func run(t *testing.T, serverTest ServerTest, testCase *TestCase) {
-	if testCase.driver == "postgres" {
-		createDb(TEST_DB)
-		defer dropDb(TEST_DB)
-	}
-	goSlowServer := newGoSlowServer(testCase)
-	server := httptest.NewServer(goSlowServer)
-	defer server.Close()
-	defer goSlowServer.storage.db.Close() // so we can drop database
-	serverTest(t, server, testCase)
-}
-
-func zeroSiteServerTest(t *testing.T, server *httptest.Server, testCase *TestCase) {
-	shouldRespondWith(t, DEFAULT_RESPONSE,
-		createGET(server.URL, "/", makeFullDomain("0")))
-}
-
-func shouldRespondWith(t *testing.T, expectedResponse []byte, request *http.Request) {
-	response := do(request)
-	bytesShouldBeEqual(t, expectedResponse, read(response))
-}
-
-func TestTooLargeDelay(t *testing.T) {
-	runAll(t, tooLargeDelayServerTest, multiDomainTestCases)
-}
-
-func tooLargeDelayServerTest(t *testing.T, server *httptest.Server, testCase *TestCase) {
-	dontAllowToCreateEndpointWithDelay(t, server, time.Duration(1000)*time.Second)
-}
-
-func dontAllowToCreateEndpointWithDelay(t *testing.T, server *httptest.Server, delay time.Duration) {
-	withNewDomain(server, func(domain string) {
-		resp := createEndpoint(server, &Endpoint{Site: getSite(domain), Path: "/", Delay: delay})
-
-		shouldHaveStatusCode(t, http.StatusBadRequest, resp)
-		shouldHaveStatusCode(t, http.StatusNotFound, GET(server.URL, "/", domain))
+		shouldCreateSiteWithEndpoint(t, server, &Endpoint{Method: "GET", Path: "/path/", Response: []byte("long")})
+		shouldCreateSiteWithEndpoint(t, server, &Endpoint{Method: "GET", Path: "/path", Response: []byte("short")})
 	})
 }
 
-type DomainTest func(domain string)
+func shouldCreateSiteWithEndpoint(t *testing.T, server *TestServer, endpoint *Endpoint) {
+	site := server.createSite(endpoint)
+	req := server.makeRequestFor(&Endpoint{Site: site, Method: endpoint.Method, Path: endpoint.Path})
+	shouldRespondWith(t, endpoint.Response, req)
+}
 
-func withNewDomain(server *httptest.Server, domainTest DomainTest) {
-	domain := createDomain(server, &Endpoint{Path: "/path-is-irrelevant"})
-	domainTest(domain)
+func TestZeroSite(t *testing.T) {
+	withNewMultiSiteServer(func(server *TestServer) {
+
+		shouldRespondWith(t, DEFAULT_RESPONSE,
+			createGET(server.getURL(), "/", makeFullDomain("0")))
+	})
+}
+
+func withNewMultiSiteServer(serverTest ServerTest) {
+	withNewServer(MULTI_SITE_MODE, serverTest)
+}
+
+func withNewServer(adminPathPrefix string, serverTest ServerTest) {
+	for _, driver := range getDrivers() {
+		withNewServerUsing(driver, adminPathPrefix, serverTest)
+	}
+}
+
+func getDrivers() []string {
+	drivers := []string{"sqlite3"}
+	if !testing.Short() {
+		drivers = append(drivers, "postgres")
+	}
+	return drivers
+}
+
+func withNewServerUsing(driver string, adminPathPrefix string, serverTest ServerTest) {
+	if driver == "postgres" {
+		createDb(TEST_POSTGRES_DB)
+		defer dropDb(TEST_POSTGRES_DB)
+	}
+	goSlowServer := newGoSlowServer(driver, adminPathPrefix)
+	runningServer := httptest.NewServer(goSlowServer)
+	defer runningServer.Close()
+	defer goSlowServer.storage.db.Close() // close db connections, so we can drop database later
+	serverTest(&TestServer{goSlowServer: goSlowServer, runningServer: runningServer})
+}
+
+func withServers(adminPathPrefixes []string, serverTest ServerTest) {
+	for _, adminPathPrefix := range adminPathPrefixes {
+		withNewServer(adminPathPrefix, serverTest)
+	}
+}
+
+func shouldRespondWith(t *testing.T, expectedResponse []byte, req *http.Request) {
+	resp := do(req)
+	bytesShouldBeEqual(t, expectedResponse, read(resp))
+}
+
+func TestTooLargeDelay(t *testing.T) {
+	withServers([]string{MULTI_SITE_MODE, "/goslow"}, func(server *TestServer) {
+
+		dontAllowToCreateEndpointWithDelay(t, server, time.Duration(1000)*time.Second)
+	})
+}
+
+func dontAllowToCreateEndpointWithDelay(t *testing.T, server *TestServer, delay time.Duration) {
+	server.withNewSite(func(site string) {
+		resp := server.createEndpoint(&Endpoint{Site: site, Path: "/", Delay: delay})
+
+		shouldHaveStatusCode(t, http.StatusBadRequest, resp)
+		shouldHaveStatusCode(t, http.StatusNotFound, GET(server.getURL(), "/", makeFullDomain(site)))
+	})
+}
+
+type SiteTest func(site string)
+
+func (server *TestServer) withNewSite(siteTest SiteTest) {
+	var site string
+	if server.isInSingleSiteMode() {
+		site = EMPTY_SITE
+	} else {
+		site = server.createSite(&Endpoint{Path: "/-fake-path-just-to-create-new-site"})
+	}
+
+	siteTest(site)
+}
+
+func (server *TestServer) isInSingleSiteMode() bool {
+	return server.goSlowServer.isInSingleSiteMode()
+}
+
+// TODO: build url with url.URL not Sprintf
+// TODO: endpoint is strange argument here, think of something better
+// TODO: add test for this function
+func (server *TestServer) createSite(endpoint *Endpoint) string {
+	if server.isInSingleSiteMode() {
+		log.Fatalf("Can't create site: running in single site mode. Site endpoint: %v", endpoint)
+	}
+	resp := POST(server.getURL(), fmt.Sprintf("%s?output=short&method=%s", endpoint.Path, endpoint.Method),
+		makeFullDomain("create"), endpoint.Response)
+	domain := string(read(resp))
+	return getSubdomain(domain)
+}
+
+func (server *TestServer) getURL() string {
+	return server.runningServer.URL
+}
+
+func (server *TestServer) getAdminPathPrefix() string {
+	return server.goSlowServer.config.adminPathPrefix
+}
+
+func (server *TestServer) createEndpoint(endpoint *Endpoint) *http.Response {
+	site := "admin-" + endpoint.Site
+	path := endpoint.Path
+	if server.isInSingleSiteMode() {
+		site = EMPTY_SITE
+		path = join(server.getAdminPathPrefix(), endpoint.Path)
+	}
+
+	req := createPOST(server.getURL(), path, makeFullDomain(site),
+		endpoint.Response)
+	req.URL.RawQuery = getQueryString(endpoint)
+	return do(req)
 }
 
 func TestChangeBuiltinSites(t *testing.T) {
-	runAll(t, changeBuiltinSitesServerTest, multiDomainTestCases)
+	withNewMultiSiteServer(func(server *TestServer) {
+
+		dontAllowToChangeSite(t, server, http.StatusForbidden, "0")
+		dontAllowToChangeSite(t, server, http.StatusForbidden, "599")
+		dontAllowToChangeSite(t, server, http.StatusForbidden, "create")
+	})
 }
 
-func changeBuiltinSitesServerTest(t *testing.T, server *httptest.Server, testCase *TestCase) {
-	dontAllowToChangeSite(t, server, http.StatusForbidden, "0")
-	dontAllowToChangeSite(t, server, http.StatusForbidden, "599")
-	dontAllowToChangeSite(t, server, http.StatusForbidden, "create")
-}
-
-func dontAllowToChangeSite(t *testing.T, server *httptest.Server, expectedStatusCode int, site string) {
-	resp := createEndpoint(server, &Endpoint{Site: site, Path: "/test", Response: []byte("hop"), Method: "GET"})
+func dontAllowToChangeSite(t *testing.T, server *TestServer, expectedStatusCode int, site string) {
+	resp := server.createEndpoint(&Endpoint{Site: site, Method: "GET", Path: "/test", Response: []byte("hop")})
 	shouldHaveStatusCode(t, expectedStatusCode, resp)
 }
 
 func TestChangeUnknownSites(t *testing.T) {
-	runAll(t, changeUnknownSitesServerTest, multiDomainTestCases)
-}
+	withNewMultiSiteServer(func(server *TestServer) {
 
-func changeUnknownSitesServerTest(t *testing.T, server *httptest.Server, testCase *TestCase) {
-	dontAllowToChangeSite(t, server, http.StatusNotFound, "")
-	dontAllowToChangeSite(t, server, http.StatusNotFound, "uknown-site")
-	dontAllowToChangeSite(t, server, http.StatusNotFound, "admin-500")
-	dontAllowToChangeSite(t, server, http.StatusNotFound, "admin-create")
+		dontAllowToChangeSite(t, server, http.StatusNotFound, "")
+		dontAllowToChangeSite(t, server, http.StatusNotFound, "uknown-site")
+		dontAllowToChangeSite(t, server, http.StatusNotFound, "admin-500")
+		dontAllowToChangeSite(t, server, http.StatusNotFound, "admin-create")
+	})
 }
 
 func TestDelaySites(t *testing.T) {
-	runAll(t, delaySitesServerTest, multiDomainTestCases)
+	withNewMultiSiteServer(func(server *TestServer) {
+
+		shouldRespondInTimeInterval(t, 0, 0.1, // seconds
+			createGET(server.getURL(), "/", makeFullDomain("0")))
+
+		shouldRespondInTimeInterval(t, 1, 1.1, // seconds
+			createGET(server.getURL(), "/", makeFullDomain("1")))
+	})
 }
 
-func delaySitesServerTest(t *testing.T, server *httptest.Server, testCase *TestCase) {
-	shouldRespondInTimeInterval(t, 0, 0.1, // seconds
-		createGET(server.URL, "/", makeFullDomain("0")),
-	)
-
-	shouldRespondInTimeInterval(t, 1, 1.1, // seconds
-		createGET(server.URL, "/", makeFullDomain("1")),
-	)
-}
-
+// TODO: does every multi-site test needs to begin with "withNewMultiSiteServer(func...)?"
 func TestStatusSites(t *testing.T) {
-	runAll(t, statusSitesServerTest, multiDomainTestCases)
-}
+	withNewMultiSiteServer(func(server *TestServer) {
 
-func statusSitesServerTest(t *testing.T, server *httptest.Server, testCase *TestCase) {
-	siteShouldRespondWithStatusCode(t, server, 200, "200")
-	siteShouldRespondWithStatusCode(t, server, 404, "404")
-	siteShouldRespondWithStatusCode(t, server, 599, "599")
+		siteShouldRespondWithStatusCode(t, server, 200, "200")
+		siteShouldRespondWithStatusCode(t, server, 404, "404")
+		siteShouldRespondWithStatusCode(t, server, 599, "599")
+	})
 }
 
 // TODO: do we need to carry server argument in this and similar functions?
-func siteShouldRespondWithStatusCode(t *testing.T, server *httptest.Server, statusCode int, site string) {
-	resp := GET(server.URL, "/", makeFullDomain(site))
-	shouldHaveStatusCode(t, statusCode, resp)
+func siteShouldRespondWithStatusCode(t *testing.T, server *TestServer, expectedStatusCode int, site string) {
+	resp := GET(server.getURL(), "/", makeFullDomain(site))
+	shouldHaveStatusCode(t, expectedStatusCode, resp)
 }
 
-func TestEndpointCreation(t *testing.T) {
-	runAll(t, endpointCreationServerTest, endpointCreationTestCases)
+func shouldRespondWithStatusCode(t *testing.T, expectedStatusCode int, req *http.Request) {
+	resp := do(req)
+	shouldHaveStatusCode(t, expectedStatusCode, resp)
 }
 
-func endpointCreationServerTest(t *testing.T, server *httptest.Server, testCase *TestCase) {
-	prefix := testCase.adminPathPrefix
-	isInSingleSiteMode := prefix != ""
-	domain, site := TEST_DEPLOYED_ON, ""
-	root_response := []byte("haha")
-	test_response := []byte("hop")
-	test_post_response := []byte("for POST")
-	empty_payload := []byte("")
+func TestCreateEndpoint(t *testing.T) {
+	withServers([]string{MULTI_SITE_MODE, "/goslow"}, func(server *TestServer) {
+		server.withNewSite(func(site string) {
 
-	if isInSingleSiteMode {
-		resp := createEndpoint(server, &Endpoint{Path: join(prefix, "/"), Response: root_response})
-		shouldHaveStatusCode(t, http.StatusOK, resp)
-	} else {
-		domain = createDomain(server, &Endpoint{Path: join(prefix, "/"), Response: root_response})
-		site = getSite(domain)
+			shouldCreateEndpoint(t, server, &Endpoint{Site: site, Method: "GET", Path: "/test", Response: []byte("test-get")})
+			shouldRespondWithStatusCode(t, http.StatusNotFound,
+				server.makeRequestFor(&Endpoint{Site: site, Method: "GET", Path: "/unknown"}))
+			shouldRespondWithStatusCode(t, http.StatusNotFound,
+				server.makeRequestFor(&Endpoint{Site: site, Method: "POST", Path: "/test"}))
+		})
+	})
+}
+
+func shouldCreateEndpoint(t *testing.T, server *TestServer, endpoint *Endpoint) {
+	server.withNewSite(func(site string) {
+		server.createEndpoint(endpoint)
+		shouldRespondWith(t, endpoint.Response, server.makeRequestFor(endpoint))
+	})
+}
+
+func (server *TestServer) makeRequestFor(endpoint *Endpoint) *http.Request {
+	return createRequest(getMethodForRequest(endpoint), server.getURL(), endpoint.Path,
+		makeFullDomain(endpoint.Site), nil)
+}
+
+func getMethodForRequest(endpoint *Endpoint) string {
+	if endpoint.Method == MATCHES_ANY_STRING {
+		return "GET" // MATCHES_ANY_STRING is ephemeral, return something concrete
 	}
-
-	bytesShouldBeEqual(t, read(GET(server.URL, "/", domain)), root_response)
-
-	// testing GET endpoint
-	resp := createEndpoint(server, &Endpoint{Site: site, Path: join(prefix, "/test"), Response: test_response, Method: "GET"})
-	shouldHaveStatusCode(t, http.StatusOK, resp)
-	// checking that GET /test endpoint works
-	bytesShouldBeEqual(t, read(GET(server.URL, "/test", domain)), test_response)
-	// checking that GET /test doesn't affect POST
-	resp = POST(server.URL, "/test", domain, []byte(""))
-	intsShouldBeEqual(t, 404, resp.StatusCode)
-
-	// testing POST endpoint
-	resp = createEndpoint(server, &Endpoint{Site: site, Path: join(prefix, "/test"), Response: test_post_response, Method: "POST",
-		Delay: time.Duration(100) * time.Millisecond})
-	shouldHaveStatusCode(t, http.StatusOK, resp)
-	// checking that POST endpoint doesn't affect GET
-	bytesShouldBeEqual(t, read(GET(server.URL, "/test", domain)), test_response)
-	// checking that POST /test endpoint works
-	bytesShouldBeEqual(t, read(POST(server.URL, "/test", domain, empty_payload)), test_post_response)
-	shouldRespondInTimeInterval(t, 0.1, 0.15, createPOST(server.URL, "/test", domain, empty_payload))
+	return endpoint.Method
 }
 
-func newGoSlowServer(testCase *TestCase) *Server {
+// TODO: refactor
+func TestEndpointMethodsClash(t *testing.T) {
+	withServers([]string{MULTI_SITE_MODE, "/goslow"}, func(server *TestServer) {
+		server.withNewSite(func(site string) {
+
+			getEndpoint := &Endpoint{Site: site, Method: "GET", Path: "/test", Response: []byte("test-get")}
+			postEndpoint := &Endpoint{Site: site, Method: "POST", Path: "/test", Response: []byte("test-post")}
+			shouldCreateEndpoint(t, server, getEndpoint)
+			shouldCreateEndpoint(t, server, postEndpoint)
+
+			shouldRespondWith(t, getEndpoint.Response, server.makeRequestFor(getEndpoint))
+			shouldRespondWith(t, postEndpoint.Response, server.makeRequestFor(postEndpoint))
+		})
+	})
+}
+
+// TODO: refactor, remove duplication with TestEndpointMethodsClash
+func TestEndpointAnyMethod(t *testing.T) {
+	withServers([]string{MULTI_SITE_MODE, "/goslow"}, func(server *TestServer) {
+		server.withNewSite(func(site string) {
+
+			anyMethodEndpoint := &Endpoint{Site: site, Method: "", Path: "/test", Response: []byte("test-any-method")}
+			shouldCreateEndpoint(t, server, anyMethodEndpoint)
+
+			shouldRespondWith(t, anyMethodEndpoint.Response, server.makeRequestFor(withMethod(anyMethodEndpoint, "GET")))
+			shouldRespondWith(t, anyMethodEndpoint.Response, server.makeRequestFor(withMethod(anyMethodEndpoint, "POST")))
+		})
+	})
+}
+
+func withMethod(endpoint *Endpoint, method string) *Endpoint {
+	copy := *endpoint
+	copy.Method = method
+	return &copy
+}
+
+func withPath(endpoint *Endpoint, path string) *Endpoint {
+	copy := *endpoint
+	copy.Path = path
+	return &copy
+}
+
+func TestEndpointPathsClash(t *testing.T) {
+	withServers([]string{MULTI_SITE_MODE, "/goslow"}, func(server *TestServer) {
+		server.withNewSite(func(site string) {
+
+			shortEndpoint := &Endpoint{Site: site, Method: "GET", Path: "/test", Response: []byte("test-short")}
+			longEndpoint := withPath(shortEndpoint, "/test/") // with trailing slash
+			longEndpoint.Response = []byte("test-long")
+			shouldCreateEndpoint(t, server, shortEndpoint)
+			shouldCreateEndpoint(t, server, longEndpoint)
+
+			shouldRespondWith(t, shortEndpoint.Response, server.makeRequestFor(shortEndpoint))
+			shouldRespondWith(t, longEndpoint.Response, server.makeRequestFor(longEndpoint))
+		})
+	})
+}
+
+func TestEndpointDelay(t *testing.T) {
+	withServers([]string{MULTI_SITE_MODE, "/goslow"}, func(server *TestServer) {
+		server.withNewSite(func(site string) {
+
+			delayEndpoint := &Endpoint{Site: site, Method: "GET", Path: "/test", Delay: time.Duration(100) * time.Millisecond, Response: []byte("test-delay")}
+			shouldCreateEndpoint(t, server, delayEndpoint)
+
+			shouldRespondInTimeInterval(t, 0.1, 0.15, server.makeRequestFor(delayEndpoint))
+		})
+	})
+}
+
+func withNewSingleSiteServer(adminPathPrefix string, serverTest ServerTest) {
+	withNewServer(adminPathPrefix, serverTest)
+}
+
+func newGoSlowServer(driver string, adminPathPrefix string) *Server {
 	config := DEFAULT_CONFIG // copies DEFAULT_CONFIG
 	config.deployedOn = TEST_DEPLOYED_ON
-	config.createDefaultEndpoints = testCase.createDefaultEndpoints
-	config.adminPathPrefix = testCase.adminPathPrefix
-	config.driver = testCase.driver
-	config.dataSource = testCase.dataSource
+	config.driver = driver
+	config.dataSource = getDataSource(driver)
+	config.createDefaultEndpoints = (adminPathPrefix == "")
+	config.adminPathPrefix = adminPathPrefix
 	return NewServer(&config)
 }
 
+func getDataSource(driver string) string {
+	dataSource, knownDriver := DATA_SOURCE[driver]
+	if !knownDriver {
+		log.Fatalf("unknown driver: <%s>", driver)
+	}
+	return dataSource
+}
+
 // TODO: is it okay to have 3 string arguments?
-// TODO: shouldn't host argument come first?
+// TODO: shouldn't host argument come first or at least before path?
 // TODO: same for createGET, POST, and createPOST
+// TODO: rename host to domain everywhere?
+// TODO: GET, POST, createGET, createPOST, and createRequest should be the TestServer methods
+// and look like this: server.GET("0", "/")
 func GET(url, path, host string) *http.Response {
 	req := createGET(url, path, host)
 	return do(req)
@@ -343,6 +428,7 @@ func shouldHaveStatusCode(t *testing.T, statusCode int, resp *http.Response) {
 
 // TODO: build url with url.URL not Sprintf
 // TODO: endpoint is strange argument here, think of something better
+// TODO: add test for this function
 func createDomain(server *httptest.Server, endpoint *Endpoint) string {
 	resp := POST(server.URL, fmt.Sprintf("%s?output=short&method=GET", endpoint.Path),
 		makeFullDomain("create"), endpoint.Response)
@@ -360,13 +446,6 @@ func createPOST(url, path, host string, payload []byte) *http.Request {
 
 func getSite(domain string) string {
 	return strings.Split(domain, ".")[0]
-}
-
-func createEndpoint(server *httptest.Server, endpoint *Endpoint) *http.Response {
-	req := createPOST(server.URL, endpoint.Path, makeFullDomain("admin-"+endpoint.Site),
-		endpoint.Response)
-	req.URL.RawQuery = getQueryString(endpoint)
-	return do(req)
 }
 
 func getQueryString(endpoint *Endpoint) string {

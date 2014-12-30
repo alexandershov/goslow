@@ -1,6 +1,7 @@
 package main
 
 // TODO: look at different places where you can supply good error messages
+// TODO: rename domain -> site where appropriate
 
 import (
 	"fmt"
