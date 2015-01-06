@@ -31,7 +31,7 @@ var (
 Let's say you want to add an endpoint {{ .Path }}
 and you want it to respond to GET requests with "{{ .TruncatedResponse }}" and 2.5 seconds delay.
 
-Just make a POST request to your admin domain ...
+Just make a POST request ...
 curl -d "{{ .TruncatedResponse }}" "{{ .AdminDomain }}{{ .AdminPathPrefix }}{{ .Path }}?delay=2.5&method=GET"
 
 ... and you're done!
@@ -39,7 +39,7 @@ curl -d "{{ .TruncatedResponse }}" "{{ .AdminDomain }}{{ .AdminPathPrefix }}{{ .
 
 	EXAMPLE_CREATE_SITE_TEMPLATE = makeTemplate("example create site",
 		`Example:
-To create a new site just make a POST request ...
+To create a new site make a POST request ...
 curl -d "{{ .TruncatedResponse }}" "{{ .CreateDomain }}{{ .AdminPathPrefix }}{{ .Path }}?delay=2.5&method=GET"
 
 ... and you're done!
@@ -61,6 +61,8 @@ You can configure it with the POST requests to {{ .AdminDomain }}
 Endpoint http://{{ .Domain }}{{ .Path }} isn't configured yet.
 `)
 
+	// TODO: rename, name looks like it helps to create sites, but actually it
+	// handles bad requests to create.goslow.link
 	HELP_CREATE_SITE_TEMPLATE = makeTemplate("help create site",
 		`Oopsie daisy!
 Make a POST request to http://{{ .CreateDomain }} to create new endpoints.
@@ -68,12 +70,14 @@ Make a POST request to http://{{ .CreateDomain }} to create new endpoints.
 
 	// TODO: rename
 	UNKNOWN_ERROR_TEMPLATE = makeTemplate("unknown error",
-		`Oopsie daisy! Server is probably misconfigured. It's not your fault.
+		`Oopsie daisy!
+Server is probably misconfigured. It's not your fault.
 
 Please contact codumentary.com@gmail.com for help.
 `)
 
 	UNKNOWN_SITE_TEMPLATE = makeTemplate("unknown site",
-		`Oopsie daisy! Site {{ .Site }} doesn't exist.
+		`Oopsie daisy!
+Site {{ .Site }} doesn't exist.
 `)
 )

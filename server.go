@@ -501,39 +501,33 @@ func (server *Server) handleUnknownEndpoint(w http.ResponseWriter, req *http.Req
 
 	endpoint := &Endpoint{Site: site, Path: server.getEndpointPath(req)}
 	templateData := server.makeTemplateData(endpoint)
+	exampleTemplateData := *templateData
+	exampleTemplateData.TruncatedResponse = "hohoho"
 
 	BANNER_TEMPLATE.Execute(w, nil)
 
 	switch {
 	case server.isInSingleSiteMode():
-		exampleTemplateData := *templateData
-		exampleTemplateData.TruncatedResponse = "hohoho"
-		// TODO: why do we need both templateData and exampleTemplateData?
 		UNKNOWN_ENDPOINT_TEMPLATE.Execute(w, templateData)
+		fmt.Fprintln(w)
 		EXAMPLE_ADD_ENDPOINT_TEMPLATE.Execute(w, exampleTemplateData)
 
-	case isCreate(site):
-		exampleTemplateData := *templateData
-		exampleTemplateData.TruncatedResponse = "hohoho"
+	case isCreate(site): // bad request to create.goslow.link
 		HELP_CREATE_SITE_TEMPLATE.Execute(w, templateData)
-		fmt.Fprintln(w) // TODO: why we need two calls to Fprintln?
 		fmt.Fprintln(w)
 		EXAMPLE_CREATE_SITE_TEMPLATE.Execute(w, exampleTemplateData)
 
-	case !canChange(site):
+	case !canChange(site): // built-in site
 		UNKNOWN_ERROR_TEMPLATE.Execute(w, templateData)
 
 	case !siteExists:
-		exampleTemplateData := *templateData
-		exampleTemplateData.TruncatedResponse = "hohoho"
 		UNKNOWN_SITE_TEMPLATE.Execute(w, templateData)
+		fmt.Fprintln(w)
 		EXAMPLE_CREATE_SITE_TEMPLATE.Execute(w, exampleTemplateData)
 
-	default: // when will this branch be chosen?
-		exampleTemplateData := *templateData
-		exampleTemplateData.TruncatedResponse = "hohoho"
-		// TODO: why do we need both templateData and exampleTemplateData?
+	default: // user site
 		UNKNOWN_ENDPOINT_TEMPLATE.Execute(w, templateData)
+		fmt.Fprintln(w)
 		EXAMPLE_ADD_ENDPOINT_TEMPLATE.Execute(w, exampleTemplateData)
 	}
 	return nil
