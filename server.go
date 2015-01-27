@@ -534,31 +534,35 @@ func (server *Server) handleUnknownEndpoint(w http.ResponseWriter, req *http.Req
 }
 
 func (server *Server) createDefaultEndpoints() {
-	server.createSitesInRange(int(MIN_DELAY/time.Second), int(MAX_DELAY/time.Second))
-	server.createSitesInRange(MIN_STATUS_CODE, MAX_STATUS_CODE)
+	server.createDefaultSitesInRange(int(MIN_DELAY/time.Second), int(MAX_DELAY/time.Second))
+	server.createDefaultSitesInRange(MIN_STATUS_CODE, MAX_STATUS_CODE)
 }
 
-// TODO: extract the for loop body to a separate method
-func (server *Server) createSitesInRange(minSite, maxSite int) {
+func (server *Server) createDefaultSitesInRange(minSite, maxSite int) {
 	for i := minSite; i <= maxSite; i++ {
-		site := strconv.Itoa(i)
-		err := server.storage.CreateSite(site)
-		if err != nil {
-			log.Fatal(err)
-		}
-		endpoint := &Endpoint{
-			Site:       site,
-			Path:       MATCHES_ANY_STRING,
-			Method:     MATCHES_ANY_STRING,
-			Headers:    server.headersFor(i),
-			Delay:      server.delayFor(i),
-			StatusCode: server.statusCodeFor(i),
-			Response:   DEFAULT_RESPONSE,
-		}
-		err = server.storage.SaveEndpoint(endpoint)
-		if err != nil {
-			log.Fatal(err)
-		}
+		server.createDefaultSite(i)
+	}
+}
+
+// TODO: i should be string (also in headersFor and other *For functions)
+func (server *Server) createDefaultSite(i int) {
+	site := strconv.Itoa(i)
+	err := server.storage.CreateSite(site)
+	if err != nil {
+		log.Fatal(err)
+	}
+	endpoint := &Endpoint{
+		Site:       site,
+		Path:       MATCHES_ANY_STRING,
+		Method:     MATCHES_ANY_STRING,
+		Headers:    server.headersFor(i),
+		Delay:      server.delayFor(i),
+		StatusCode: server.statusCodeFor(i),
+		Response:   DEFAULT_RESPONSE,
+	}
+	err = server.storage.SaveEndpoint(endpoint)
+	if err != nil {
+		log.Fatal(err)
 	}
 }
 
