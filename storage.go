@@ -162,13 +162,16 @@ func (storage *Storage) CreateSite(site string) error {
 	return err
 }
 
-// TODO: generalize (e.g storage.HasResults(sql string))
 func (storage *Storage) SiteExists(site string) (bool, error) {
-	rows, err := storage.db.Query(storage.dialectifyQuery(GET_SITE_SQL), site)
+	return storage.HasResults(GET_SITE_SQL, site)
+}
+
+func (storage *Storage) HasResults(sql string, args ...interface{}) (bool, error) {
+	rows, err := storage.db.Query(storage.dialectifyQuery(sql), args...)
 	if err != nil {
 		return false, err
 	}
 	defer rows.Close()
-	siteExists := rows.Next()
-	return siteExists, rows.Err()
+	hasResults := rows.Next()
+	return hasResults, rows.Err()
 }
