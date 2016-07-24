@@ -1,0 +1,9 @@
+[Unit]
+Description='goslow go server'
+
+[Service]
+User=goslow
+Type=simple
+PIDFile=/run/goslow.pid
+ExecStart=/usr/local/bin/goslow -deployed-on goslow.link -db postgres -site-salt $(cat /etc/goslow/site-salt) \
+  -data-source postgres://goslow@localhost/goslow -admin-path-prefix ''

@@ -2,7 +2,7 @@
 - hosts: goslow
   vars:
     gopath: "{{ lookup('env','GOPATH') }}"
-  sudo: yes
+  become: yes
   tasks:
 
    - apt: name=nginx-full state=present
@@ -16,13 +16,18 @@
 
    - copy: src={{ gopath }}/release/goslow dest=/usr/local/bin/goslow mode=0555
    - copy: src=goslow.conf dest=/etc/init/goslow.conf
+   - copy: src=goslow.service dest=/lib/systemd/system/goslow.service
    - copy: src=nginx.conf dest=/etc/nginx/nginx.conf
    - copy: src=~/tmp/site-salt dest=/etc/goslow/site-salt force=no
 
    - postgresql_db: name=goslow
-     sudo_user: postgres
+     become_user: postgres
+     vars:
+         ansible_ssh_pipelining: true
    - postgresql_user: db=goslow name=goslow priv=ALL
-     sudo_user: postgres
+     become_user: postgres
+     vars:
+         ansible_ssh_pipelining: true
 
-   - service: name=nginx state=reloaded
+   - service: name=nginx state=restarted
    - service: name=goslow state=restarted
